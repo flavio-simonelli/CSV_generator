@@ -1,4 +1,4 @@
-package org.example;
+package it.isw2.flaviosimonelli;
 
 public class Main {
     public static void main(String[] args) {
