@@ -5,10 +5,12 @@ import java.util.List;
 
 public class Repository {
     private final String url;
+    private final String localpath;
     private final List<Release> listReleases;
 
-    public Repository(String url) {
+    public Repository(String url, String localpath) {
         this.url = url;
+        this.localpath = localpath;
         this.listReleases = new ArrayList<>(); // initialize empty list
     }
 
@@ -22,5 +24,9 @@ public class Repository {
 
     public void insertRelease(Release r) {
         this.listReleases.add(r);
+    }
+
+    public String getLocalPath() {
+        return localpath;
     }
 }

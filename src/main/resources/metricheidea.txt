@@ -1,0 +1,5 @@
+Possibili metriche che possono essere analizzate:
+1. quante righe a modificato l'autore di quel commit fino a quel momento, comprese le righe modificate in quel commit
+2. quante righe sono state modificate di quel metodo
+3. quante sviluppatori hanno modificato il metodo
+4. Se il commit ha portato ad un refactoring del nome del
