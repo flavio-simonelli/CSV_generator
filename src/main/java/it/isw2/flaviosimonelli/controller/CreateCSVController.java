@@ -1,19 +1,20 @@
 package it.isw2.flaviosimonelli.controller;
 
-import it.isw2.flaviosimonelli.model.Repository;
-import it.isw2.flaviosimonelli.utils.Bean.RepositoryBean;
-import it.isw2.flaviosimonelli.utils.dao.GitDAO;
-import it.isw2.flaviosimonelli.utils.dao.GitDAOFactory;
-import it.isw2.flaviosimonelli.utils.exception.GitException;
+import it.isw2.flaviosimonelli.utils.dao.impl.JiraService;
+import it.isw2.flaviosimonelli.utils.exception.SystemException;
+import it.isw2.flaviosimonelli.utils.Bean.ProjectBean;
+
 
 public class CreateCSVController {
-    public void cloneRepository(RepositoryBean repo) {
-        GitDAO gitDAO = GitDAOFactory.create();
-        Repository repository = new Repository(repo.getUrl(), repo.getLocalpath());
+
+    public boolean getJIRATickets(ProjectBean project) {
+        JiraService jiraService = new JiraService();
         try {
-            gitDAO.cloneRepository(repository);
-        } catch (GitException e) {
-            throw new RuntimeException(e);
+            jiraService.getFixedBugTickets(project.getProjectName());
+        } catch (SystemException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
+        return true;
     }
 }
