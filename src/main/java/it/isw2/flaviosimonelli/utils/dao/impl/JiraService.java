@@ -1,5 +1,6 @@
 package it.isw2.flaviosimonelli.utils.dao.impl;
 
+import it.isw2.flaviosimonelli.model.Project;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -16,12 +17,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class JiraService {
-    private final String JIRA_URL = "https://issues.apache.org/jira/rest/api/2/search";
+    private final String JIRA_URL = "https://issues.apache.org/jira/rest/api/2";
     private final int MAX_RESULTS_PER_PAGE = 100; // Imposta un limite massimo di risultati per pagina
 
     // Funzione che esegue la richiesta e ottiene il JSON con supporto alla paginazione
-    public JSONObject getJsonFromJira(String jql, int startAt, int maxResults) throws IOException, JSONException, URISyntaxException {
-        String url = JIRA_URL + "?jql=" + jql + "&startAt=" + startAt + "&maxResults=" + maxResults;
+    private JSONObject getJsonFromJira(String jql, int startAt, int maxResults) throws IOException, JSONException, URISyntaxException {
+        String url = JIRA_URL + "/search/?jql=" + jql + "&startAt=" + startAt + "&maxResults=" + maxResults;
         // Stampa l'URL per debug
         System.out.println("URL: " + url);
 
@@ -46,7 +47,8 @@ public class JiraService {
     }
 
     // Funzione che traduce il risultato JSON in una lista di Ticket
-    public List<Ticket> getFixedBugTickets(String projName) throws SystemException {
+    public List<Ticket> getFixedBugTickets(Project project) throws SystemException {
+        String projName = project.getJiraID();
         // Costruisci la query JQL
         String Jql = "project%20%3D%20" + projName + "%20AND%20issuetype%20%3D%20Bug%20AND%20status%20in%20%28Resolved%2C%20Closed%29%20AND%20resolution%20%3D%20Fixed%20ORDER%20BY%20fixVersion%20ASC";
 
@@ -132,5 +134,68 @@ public class JiraService {
         }
 
         return tickets;
+    }
+
+    /**
+     * Recupera tutte le versioni di un progetto da JIRA.
+     *
+     * @param projName Il nome o la chiave del progetto
+     * @return Lista di stringhe contenenti i nomi delle versioni
+     * @throws SystemException Se si verificano errori durante la chiamata API
+     */
+    public List<String> getVersionsProject(Project project) throws SystemException {
+        List<String> versions = new ArrayList<>();
+        String projName = project.getJiraID();
+
+        try {
+            // Costruisci l'endpoint per le versioni del progetto
+            String url = JIRA_URL + "/project/" + projName + "/versions";
+
+            // Stampa l'URL per debug
+            System.out.println("URL versioni: " + url);
+
+            // Effettua la chiamata HTTP
+            URI uri = new URI(url);
+            HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
+            connection.setRequestMethod("GET");
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw new IOException("Risposta non valida da JIRA. Codice: " + responseCode);
+            }
+
+            // Leggi la risposta
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+            StringBuilder response = new StringBuilder();
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) {
+                response.append(inputLine);
+            }
+            in.close();
+
+            // Elabora il JSONArray restituito
+            JSONArray jsonVersions = new JSONArray(response.toString());
+            for (int i = 0; i < jsonVersions.length(); i++) {
+                JSONObject version = jsonVersions.getJSONObject(i);
+                versions.add(version.getString("name"));
+            }
+
+            System.out.println("Trovate " + versions.size() + " versioni per il progetto " + projName);
+
+            // Stampa le prime 10 versioni
+            int limit = Math.min(10, versions.size());
+            System.out.println("\nPrime " + limit + " versioni:");
+            for (int i = 0; i < limit; i++) {
+                System.out.println((i + 1) + ". " + versions.get(i));
+            }
+
+        } catch (JSONException | IOException | URISyntaxException e) {
+            SystemException exception = new SystemException("Errore durante il recupero delle versioni: " + e.getMessage());
+            exception.initCause(e);
+            throw exception;
+        }
+
+        return versions;
     }
 }
