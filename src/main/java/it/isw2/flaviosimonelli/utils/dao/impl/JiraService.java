@@ -139,12 +139,12 @@ public class JiraService {
     /**
      * Recupera tutte le versioni di un progetto da JIRA.
      *
-     * @param projName Il nome o la chiave del progetto
+     * @param project modello del progetto
      * @return Lista di stringhe contenenti i nomi delle versioni
      * @throws SystemException Se si verificano errori durante la chiamata API
      */
-    public List<String> getVersionsProject(Project project) throws SystemException {
-        List<String> versions = new ArrayList<>();
+    public List<String> getReleasesProject(Project project) throws SystemException {
+        List<String> releases = new ArrayList<>();
         String projName = project.getJiraID();
 
         try {
@@ -178,16 +178,20 @@ public class JiraService {
             JSONArray jsonVersions = new JSONArray(response.toString());
             for (int i = 0; i < jsonVersions.length(); i++) {
                 JSONObject version = jsonVersions.getJSONObject(i);
-                versions.add(version.getString("name"));
+                // Aggiungi il nome della versione alla lista solo se il campo "released" è true
+                if (version.getBoolean("released")) {
+                    releases.add(version.getString("name"));
+                }
             }
 
-            System.out.println("Trovate " + versions.size() + " versioni per il progetto " + projName);
+            System.out.println("Trovate " + releases.size() + " release per il progetto " + projName);
+            System.out.println("Trovate " + jsonVersions.length() + " versioni per il progetto " + projName);
 
-            // Stampa le prime 10 versioni
-            int limit = Math.min(10, versions.size());
+            // Stampa le prime 10 release
+            int limit = Math.min(10, releases.size());
             System.out.println("\nPrime " + limit + " versioni:");
             for (int i = 0; i < limit; i++) {
-                System.out.println((i + 1) + ". " + versions.get(i));
+                System.out.println((i + 1) + ". " + releases.get(i));
             }
 
         } catch (JSONException | IOException | URISyntaxException e) {
@@ -196,6 +200,6 @@ public class JiraService {
             throw exception;
         }
 
-        return versions;
+        return releases;
     }
 }

@@ -19,7 +19,7 @@ public class CreateCSVController {
             e.printStackTrace();
         }
         try {
-            jiraService.getVersionsProject(project);
+            jiraService.getReleasesProject(project);
         } catch (SystemException e) {
             throw new RuntimeException(e);
         }
