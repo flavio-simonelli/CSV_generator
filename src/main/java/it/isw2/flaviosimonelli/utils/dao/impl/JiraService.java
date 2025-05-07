@@ -5,7 +5,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import it.isw2.flaviosimonelli.model.Ticket;
-import it.isw2.flaviosimonelli.utils.dao.ticketMenagerDAO;
 import it.isw2.flaviosimonelli.utils.exception.SystemException;
 
 import java.io.*;
@@ -16,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-public class JiraService implements ticketMenagerDAO {
+public class JiraService {
     private final String JIRA_URL = "https://issues.apache.org/jira/rest/api/2/search";
     private final int MAX_RESULTS_PER_PAGE = 100; // Imposta un limite massimo di risultati per pagina
 

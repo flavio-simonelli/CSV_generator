@@ -1,7 +1,7 @@
 package it.isw2.flaviosimonelli.view;
 
 import it.isw2.flaviosimonelli.controller.CreateCSVController;
-import it.isw2.flaviosimonelli.utils.Bean.ProjectBean;
+import it.isw2.flaviosimonelli.utils.bean.ProjectBean;
 
 import java.util.Scanner;
 

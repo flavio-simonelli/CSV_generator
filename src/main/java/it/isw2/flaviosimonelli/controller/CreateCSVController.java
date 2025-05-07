@@ -2,7 +2,7 @@ package it.isw2.flaviosimonelli.controller;
 
 import it.isw2.flaviosimonelli.utils.dao.impl.JiraService;
 import it.isw2.flaviosimonelli.utils.exception.SystemException;
-import it.isw2.flaviosimonelli.utils.Bean.ProjectBean;
+import it.isw2.flaviosimonelli.utils.bean.ProjectBean;
 
 
 public class CreateCSVController {
