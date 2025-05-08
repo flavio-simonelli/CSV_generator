@@ -15,7 +15,7 @@ public class Ticket {
     private String key;
     private String id;
     private List<String> affectedVersions;
-    private String fixVersion;
+    private List<String> fixVersion;
 
     public void setKey(String key) {
         this.key = key;
@@ -41,11 +41,11 @@ public class Ticket {
         return affectedVersions;
     }
 
-    public void setFixVersion(String fixVersion) {
+    public void setFixVersions(List<String> fixVersion) {
         this.fixVersion = fixVersion;
     }
 
-    public String getFixVersion() {
+    public List<String> getFixVersions() {
         return fixVersion;
     }
 

@@ -91,13 +91,13 @@ public class JiraService {
                 ticket.setId(issue.getString("id"));
                 ticket.setKey(issue.getString("key"));
 
-                // Gestione fixVersion - imposta null se ci sono più di una fixVersion
+                // Gestione fixVersion
                 JSONArray fixVersions = fields.getJSONArray("fixVersions");
-                if (fixVersions.length() == 1) {
-                    ticket.setFixVersion(fixVersions.getJSONObject(0).getString("name"));
-                } else {
-                    ticket.setFixVersion(null); // Null se ci sono 0 o più di 1 fixVersions
+                List<String> fixVersionList = new ArrayList<>();
+                for (int j = 0; j < fixVersions.length(); j++) {
+                    fixVersionList.add(fixVersions.getJSONObject(j).getString("name"));
                 }
+                ticket.setFixVersions(fixVersionList);
 
                 // Gestione affectedVersions
                 JSONArray affectedVersionsArray = fields.getJSONArray("versions");
@@ -129,7 +129,7 @@ public class JiraService {
             System.out.println("Ticket " + (i + 1) + ":");
             System.out.println("  ID: " + ticket.getId());
             System.out.println("  Key: " + ticket.getKey());
-            System.out.println("  Fix Version: " + ticket.getFixVersion());
+            System.out.println("  Fix Version: " + ticket.getFixVersions());
             System.out.println("  Affected Versions: " + ticket.getAffectedVersions());
         }
 
