@@ -1,11 +1,13 @@
 package it.isw2.flaviosimonelli.utils;
 
+import it.isw2.flaviosimonelli.model.Version;
+
 import java.util.Comparator;
 
-public class VersionComparator implements Comparator<JiraVersion> {
+public class VersionComparator implements Comparator<Version> {
 
     @Override
-    public int compare(JiraVersion v1, JiraVersion v2) {
+    public int compare(Version v1, Version v2) {
         return compareVersions(v1.getName(), v2.getName());
     }
 
