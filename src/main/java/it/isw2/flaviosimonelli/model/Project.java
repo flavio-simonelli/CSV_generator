@@ -4,7 +4,7 @@ import java.util.List;
 
 public class Project {
     private String jiraID;
-    private List<String> versions;
+    private List<Version> versions;
     private List<Ticket> ticketsFixClosed;
 
     public void setJiraID(String jiraID) {
@@ -15,11 +15,11 @@ public class Project {
         return jiraID;
     }
 
-    public void setVersions(List<String> versions) {
+    public void setVersions(List<Version> versions) {
         this.versions = versions;
     }
 
-    public List<String> getVersions() {
+    public List<Version> getVersions() {
         return versions;
     }
 

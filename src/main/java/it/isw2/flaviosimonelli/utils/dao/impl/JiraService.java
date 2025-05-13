@@ -1,6 +1,7 @@
 package it.isw2.flaviosimonelli.utils.dao.impl;
 
 import it.isw2.flaviosimonelli.model.Project;
+import it.isw2.flaviosimonelli.model.Version;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -13,6 +14,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,13 +37,7 @@ public class JiraService {
             throw new IOException("Failed to get a valid response from JIRA. HTTP response code: " + responseCode);
         }
 
-        BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
-        StringBuilder response = new StringBuilder();
-        String inputLine;
-        while ((inputLine = in.readLine()) != null) {
-            response.append(inputLine);
-        }
-        in.close();
+        StringBuilder response = ReadResponse(connection);
 
         return new JSONObject(response.toString()); // Restituisce il JSON ottenuto dalla risposta
     }
@@ -143,8 +139,8 @@ public class JiraService {
      * @return Lista di stringhe contenenti i nomi delle versioni
      * @throws SystemException Se si verificano errori durante la chiamata API
      */
-    public List<String> getReleasesProject(Project project) throws SystemException {
-        List<String> releases = new ArrayList<>();
+    public List<Version> getVersionProject(Project project) throws SystemException {
+        List<Version> versions = new ArrayList<>();
         String projName = project.getJiraID();
 
         try {
@@ -152,7 +148,7 @@ public class JiraService {
             String url = JIRA_URL + "/project/" + projName + "/versions";
 
             // Stampa l'URL per debug
-            System.out.println("URL versioni: " + url);
+            System.out.println("URL request http: " + url);
 
             // Effettua la chiamata HTTP
             URI uri = new URI(url);
@@ -165,34 +161,28 @@ public class JiraService {
             }
 
             // Leggi la risposta
-            BufferedReader in = new BufferedReader(
-                    new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
-            StringBuilder response = new StringBuilder();
-            String inputLine;
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine);
-            }
-            in.close();
+            StringBuilder response = ReadResponse(connection);
 
             // Elabora il JSONArray restituito
             JSONArray jsonVersions = new JSONArray(response.toString());
             for (int i = 0; i < jsonVersions.length(); i++) {
                 JSONObject version = jsonVersions.getJSONObject(i);
-                // Aggiungi il nome della versione alla lista solo se il campo "released" è true
-                if (version.getBoolean("released")) {
-                    releases.add(version.getString("name"));
+                Version v = new Version();
+                v.setId(version.getString("id"));
+                v.setName(version.getString("name"));
+                v.setArchived(version.getBoolean("archived"));
+                v.setReleased(version.getBoolean("released"));
+                String releaseDate = version.optString("releaseDate", null);
+                if (releaseDate != null && !releaseDate.isEmpty()) {
+                    v.setReleaseDate(LocalDate.parse(releaseDate));
                 }
+                versions.add(v);
+
             }
 
-            System.out.println("Trovate " + releases.size() + " release per il progetto " + projName);
-            System.out.println("Trovate " + jsonVersions.length() + " versioni per il progetto " + projName);
+            // Stampa di debug
+            System.out.println("Trovate " + versions.size() + " versioni per il progetto " + projName);
 
-            // Stampa le prime 10 release
-            int limit = Math.min(10, releases.size());
-            System.out.println("\nPrime " + limit + " versioni:");
-            for (int i = 0; i < limit; i++) {
-                System.out.println((i + 1) + ". " + releases.get(i));
-            }
 
         } catch (JSONException | IOException | URISyntaxException e) {
             SystemException exception = new SystemException("Errore durante il recupero delle versioni: " + e.getMessage());
@@ -200,6 +190,18 @@ public class JiraService {
             throw exception;
         }
 
-        return releases;
+        return versions;
+    }
+
+    private StringBuilder ReadResponse(HttpURLConnection connection) throws IOException {
+        BufferedReader in = new BufferedReader(
+                new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+        StringBuilder response = new StringBuilder();
+        String inputLine;
+        while ((inputLine = in.readLine()) != null) {
+            response.append(inputLine);
+        }
+        in.close();
+        return response;
     }
 }

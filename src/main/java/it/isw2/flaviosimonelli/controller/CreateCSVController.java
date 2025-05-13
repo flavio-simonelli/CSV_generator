@@ -2,6 +2,7 @@ package it.isw2.flaviosimonelli.controller;
 
 import it.isw2.flaviosimonelli.model.Project;
 import it.isw2.flaviosimonelli.model.Ticket;
+import it.isw2.flaviosimonelli.model.Version;
 import it.isw2.flaviosimonelli.utils.dao.impl.JiraService;
 import it.isw2.flaviosimonelli.utils.exception.SystemException;
 import it.isw2.flaviosimonelli.utils.bean.ProjectBean;
@@ -19,8 +20,8 @@ public class CreateCSVController {
 
         try {
             // Recupera i dati e salvali nel progetto
-            List<String> releases = jiraService.getReleasesProject(project);
-            project.setVersions(releases);
+            List<Version> versions = jiraService.getVersionProject(project);
+            project.setVersions(versions);
 
             List<Ticket> tickets = jiraService.getFixedBugTickets(project);
             project.setTicketsFixClosed(tickets);
@@ -45,7 +46,7 @@ public class CreateCSVController {
      */
     public boolean filterTickets(Project project) {
         // Usa i dati già recuperati dal metodo getJIRATickets
-        List<String> releases = project.getVersions();
+        List<Version> releases = project.getVersions();
         List<Ticket> tickets = project.getTicketsFixClosed();
 
         if (tickets == null || tickets.isEmpty() || releases == null || releases.isEmpty()) {
