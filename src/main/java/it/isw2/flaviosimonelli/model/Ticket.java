@@ -12,7 +12,6 @@ import java.util.List;
  * - fixVersion: versione del software in cui il problema è stato risolto
  */
 public class Ticket {
-    private String key;
     private String id;
     private List<String> affectedVersions;
     private List<String> fixVersion;
