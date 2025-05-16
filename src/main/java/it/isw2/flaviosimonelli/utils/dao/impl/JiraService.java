@@ -14,8 +14,11 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class JiraService {
@@ -85,7 +88,6 @@ public class JiraService {
 
                 // Estrai i dati necessari e imposta i valori nel ticket
                 ticket.setId(issue.getString("id"));
-                ticket.setKey(issue.getString("key"));
 
                 // Gestione fixVersion
                 JSONArray fixVersions = fields.getJSONArray("fixVersions");
@@ -93,7 +95,7 @@ public class JiraService {
                 for (int j = 0; j < fixVersions.length(); j++) {
                     fixVersionList.add(fixVersions.getJSONObject(j).getString("name"));
                 }
-                ticket.setFixVersions(fixVersionList);
+                ticket.setFixVersion(fixVersionList);
 
                 // Gestione affectedVersions
                 JSONArray affectedVersionsArray = fields.getJSONArray("versions");
@@ -101,8 +103,32 @@ public class JiraService {
                 for (int j = 0; j < affectedVersionsArray.length(); j++) {
                     affectedVersions.add(affectedVersionsArray.getJSONObject(j).getString("name"));
                 }
-                ticket.setAffectedVersions(affectedVersions);
+                ticket.setAffectedVersion(affectedVersions);
+                ticket.setKey(issue.getString("key"));
+                ticket.setUrl(JIRA_URL + "/browse/" + issue.getString("key"));
+                ticket.setPriorityName(fields.getJSONObject("priority").getString("name"));
 
+                if (fields.has("assignee") && !fields.isNull("assignee")) {
+                    ticket.setAssignee(fields.getJSONObject("assignee").getString("key"));
+                }
+
+                if (fields.has("creator") && !fields.isNull("creator")) {
+                    ticket.setCreator(fields.getJSONObject("creator").getString("key"));
+                }
+
+                if (fields.has("reporter") && !fields.isNull("reporter")) {
+                    ticket.setReporter(fields.getJSONObject("reporter").getString("key"));
+                }
+
+                ticket.setSummary(fields.getString("summary"));
+                ticket.setDescription(fields.optString("description", null));
+                ticket.setCreated(parseDate(fields.optString("created")));
+                ticket.setUpdated(parseDate(fields.optString("updated")));
+                ticket.setResolutionDate(parseDate(fields.optString("resolutiondate")));
+                ticket.setVotes(fields.getJSONObject("votes").getInt("votes"));
+                ticket.setWatchers(fields.getJSONObject("watches").getInt("watchCount"));
+
+                // Aggiungi il ticket alla lista
                 tickets.add(ticket);
             }
 
@@ -124,13 +150,23 @@ public class JiraService {
             Ticket ticket = tickets.get(i);
             System.out.println("Ticket " + (i + 1) + ":");
             System.out.println("  ID: " + ticket.getId());
-            System.out.println("  Key: " + ticket.getKey());
-            System.out.println("  Fix Version: " + ticket.getFixVersions());
-            System.out.println("  Affected Versions: " + ticket.getAffectedVersions());
+            System.out.println("  Fix Version: " + ticket.getFixVersion());
+            System.out.println("  Affected Versions: " + ticket.getAffectedVersion());
         }
 
         return tickets;
     }
+
+    private static Date parseDate(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) return null;
+        try {
+            return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").parse(dateStr);
+        } catch (ParseException e) {
+            e.printStackTrace(); // oppure logga meglio se preferisci
+            return null;
+        }
+    }
+
 
     /**
      * Recupera tutte le versioni di un progetto da JIRA.
