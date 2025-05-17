@@ -9,7 +9,6 @@ import it.isw2.flaviosimonelli.utils.dao.impl.JiraService;
 import it.isw2.flaviosimonelli.utils.exception.SystemException;
 import it.isw2.flaviosimonelli.utils.bean.ProjectBean;
 
-import java.util.ArrayList;
 import java.util.List;
 
 
