@@ -5,18 +5,20 @@ import it.isw2.flaviosimonelli.model.Ticket;
 import it.isw2.flaviosimonelli.model.Version;
 import it.isw2.flaviosimonelli.utils.CsvExporter;
 import it.isw2.flaviosimonelli.utils.VersionComparator;
+import it.isw2.flaviosimonelli.utils.bean.VersionManagerBean;
+import it.isw2.flaviosimonelli.utils.dao.impl.GitService;
 import it.isw2.flaviosimonelli.utils.dao.impl.JiraService;
 import it.isw2.flaviosimonelli.utils.exception.SystemException;
-import it.isw2.flaviosimonelli.utils.bean.ProjectBean;
+import it.isw2.flaviosimonelli.utils.bean.TicketManagerBean;
 
 import java.util.List;
 
 
 public class CreateCSVController {
 
-    public boolean getJIRATickets(ProjectBean projectBean) {
+    public boolean getTickets(TicketManagerBean ticketManagerBean) {
         Project project = new Project();
-        project.setJiraID(projectBean.getProjectName());
+        project.setJiraID(ticketManagerBean.getJiraID());
         JiraService jiraService = new JiraService();
 
         try {
@@ -43,6 +45,33 @@ public class CreateCSVController {
             e.printStackTrace();
             return false;
         }
+    }
+    
+    public boolean getVersions(VersionManagerBean versionManagerBean) {
+        // Clonazione o apertura del repository Git
+        if (versionManagerBean.getChoiceCloneOpen() == 1) {
+            // Clonazione del repository
+            String url = versionManagerBean.getURL();
+            String projectName = url.substring(url.lastIndexOf('/') + 1).replace(".git", "");;
+            String projectDirectory = versionManagerBean.getDirectory() + "/" + projectName;
+            // Creazione progetto model
+            Project project = new Project();
+            project.setVersionManagerURL(url);
+            project.setDirectory(projectDirectory);
+            project.setBranchName(versionManagerBean.getBranch());
+            // Clonazione del repository
+            GitService gitService = new GitService();
+            gitService.cloneRepository(project);
+        } else {
+            // Apertura del repository esistente
+            String projectDirectory = versionManagerBean.getDirectory();
+            Project project = new Project();
+            project.setDirectory(projectDirectory);
+            GitService gitService = new GitService();
+            gitService.openRepository(project);
+        }
+
+        return true;
     }
 
 }
