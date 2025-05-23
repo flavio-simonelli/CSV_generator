@@ -2,7 +2,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 import it.isw2.flaviosimonelli.controller.CreateCSVController;
-import it.isw2.flaviosimonelli.model.Project;
+import it.isw2.flaviosimonelli.model.Project.Project;
 import it.isw2.flaviosimonelli.model.Ticket;
 
 import java.util.Arrays;

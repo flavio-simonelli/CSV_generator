@@ -1,6 +1,6 @@
 package it.isw2.flaviosimonelli.utils.dao.impl;
 
-import it.isw2.flaviosimonelli.model.Project;
+import it.isw2.flaviosimonelli.model.Project.Project;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 
@@ -9,13 +9,35 @@ import java.io.File;
 public class GitService {
 
     /**
+     * Scannerizza il repository Git estraendo tutti i metodi per ogni versione
+     * @param project il progetto da scannerizzare
+     * @return true se la scannerizzazione è andata a buon fine, false altrimenti
+     */
+    public boolean scanRepository(Project project) {
+        Git git = null;
+        if (project.getVersionManagerURL() == null) {
+            git = openRepository(project);
+        } else {
+            git = cloneRepository(project);
+        }
+        if (git == null) {
+            System.err.println("Errore nell'apertura o clonazione del repository.");
+            return false;
+        }
+
+
+        return true;
+    }
+
+    /**
      * Clone repository
      * @param project repository to clone
      */
-    public void cloneRepository(Project project) {
+    public Git cloneRepository(Project project) {
+        Git git = null;
         try {
             // Clone the repository
-            Git git = Git.cloneRepository()
+            git = Git.cloneRepository()
                     .setURI(project.getVersionManagerURL())
                     .setDirectory(new File(project.getDirectory()))
                     .setBranch(project.getBranchName())
@@ -24,6 +46,7 @@ public class GitService {
         } catch (GitAPIException e) {
             System.err.println("Error cloning repository: " + e.getMessage());
         }
+        return git;
     }
 
     /**

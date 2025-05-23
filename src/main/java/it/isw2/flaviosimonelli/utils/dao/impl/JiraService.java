@@ -1,6 +1,6 @@
 package it.isw2.flaviosimonelli.utils.dao.impl;
 
-import it.isw2.flaviosimonelli.model.Project;
+import it.isw2.flaviosimonelli.model.Project.Project;
 import it.isw2.flaviosimonelli.model.Version;
 import org.json.JSONArray;
 import org.json.JSONException;

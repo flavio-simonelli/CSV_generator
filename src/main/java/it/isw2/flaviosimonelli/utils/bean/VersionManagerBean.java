@@ -4,23 +4,22 @@ public class VersionManagerBean {
     private String URL;
     private final String directory;
     private String branch;
-    private final int choiceCloneOpen;
+    private String choice;
 
-    public VersionManagerBean(String URL, String directory, String branch) {
+    public VersionManagerBean(String URL, String directory, String branch, String choice) {
         this.URL = URL;
         this.directory = directory;
         this.branch = branch;
-        this.choiceCloneOpen = 1;
+        this.choice = choice;
     }
-    public VersionManagerBean(String directory) {
+    public VersionManagerBean(String directory, String choice) {
         this.directory = directory;
-        this.choiceCloneOpen = 0;
+        this.choice = choice;
     }
 
-    public int getChoiceCloneOpen() {
-        return choiceCloneOpen;
+    public String getChoiceCloneOpen() {
+        return choice;
     }
-
     public String getBranch() {
         return branch;
     }

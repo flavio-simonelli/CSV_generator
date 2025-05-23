@@ -1,4 +1,7 @@
-package it.isw2.flaviosimonelli.model;
+package it.isw2.flaviosimonelli.model.Project;
+
+import it.isw2.flaviosimonelli.model.Ticket;
+import it.isw2.flaviosimonelli.model.Version;
 
 import java.util.List;
 
