@@ -1,46 +1,38 @@
 package it.isw2.flaviosimonelli.model;
 
-import java.time.LocalDate;
+import java.util.List;
 
 public class Version {
-    private String id;
-    private String name;
-    private boolean archived;
-    private boolean released;
-    private LocalDate releaseDate;
+    private String name; // e.g., "1.0.0"
+    private boolean released; // true if the version is released, false otherwise
+    private String hashCommit; // hash of the tag associated with this version
+    private List<Method> methods; // list of methods associated with this version
 
-    public String getId() {
-        return id;
-    }
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
     public void setName(String name) {
         this.name = name;
     }
-
-    public boolean isArchived() {
-        return archived;
-    }
-    public void setArchived(boolean archived) {
-        this.archived = archived;
+    public String getName() {
+        return name;
     }
 
-    public boolean isReleased() {
-        return released;
-    }
     public void setReleased(boolean released) {
         this.released = released;
     }
-
-    public LocalDate getReleaseDate() {
-        return releaseDate;
+    public boolean isReleased() {
+        return released;
     }
-    public void setReleaseDate(LocalDate releaseDate) {
-        this.releaseDate = releaseDate;
+
+    public void setHashCommit(String hash) {
+        this.hashCommit = hash;
+    }
+    public String getHashCommit() {
+        return hashCommit;
+    }
+
+    public void setMethods(List<Method> methods) {
+        this.methods = methods;
+    }
+    public List<Method> getMethods() {
+        return methods;
     }
 }

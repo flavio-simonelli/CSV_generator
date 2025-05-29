@@ -1,9 +1,9 @@
 package it.isw2.flaviosimonelli.utils.bean;
 
-public class TicketManagerBean {
+public class JiraBean {
     private String JiraID;
 
-    public TicketManagerBean(String JiraID) {
+    public JiraBean(String JiraID) {
         this.JiraID = JiraID;
     }
 

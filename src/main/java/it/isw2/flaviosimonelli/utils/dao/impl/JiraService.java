@@ -2,6 +2,7 @@ package it.isw2.flaviosimonelli.utils.dao.impl;
 
 import it.isw2.flaviosimonelli.model.Project.Project;
 import it.isw2.flaviosimonelli.model.Version;
+import it.isw2.flaviosimonelli.utils.VersionComparator;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -14,12 +15,9 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class JiraService {
     private final String JIRA_URL = "https://issues.apache.org/jira/rest/api/2";
@@ -86,47 +84,51 @@ public class JiraService {
                 Ticket ticket = new Ticket();
                 JSONObject fields = issue.getJSONObject("fields");
 
-                // Estrai i dati necessari e imposta i valori nel ticket
-                ticket.setId(issue.getString("id"));
-
-                // Gestione fixVersion
+                // Gestion fixVersion
                 JSONArray fixVersions = fields.getJSONArray("fixVersions");
+                // estrazione del nome delle versioni fix versions
                 List<String> fixVersionList = new ArrayList<>();
                 for (int j = 0; j < fixVersions.length(); j++) {
                     fixVersionList.add(fixVersions.getJSONObject(j).getString("name"));
                 }
-                ticket.setFixVersion(fixVersionList);
+                // Ordina la lista delle fix version in ordine crescente
+                List<String> sortedFixVersions = fixVersionList.stream()
+                        .sorted(new VersionComparator())
+                        .collect(Collectors.toList());
+
+                // Scorri all'indietro e trova la versione valida
+                String selectedFixVersion = null;
+                for (int j = sortedFixVersions.size() - 1; j >= 0; j--) {
+                    String versionName = sortedFixVersions.get(j);
+                    if (project.getVersionFromName(versionName) != null) {
+                        selectedFixVersion = versionName;
+                        break;
+                    }
+                }
+                ticket.setFixVersion(project.getVersionFromName(selectedFixVersion));
 
                 // Gestione affectedVersions
                 JSONArray affectedVersionsArray = fields.getJSONArray("versions");
-                List<String> affectedVersions = new ArrayList<>();
+                List<String> affectedVersionList = new ArrayList<>();
                 for (int j = 0; j < affectedVersionsArray.length(); j++) {
-                    affectedVersions.add(affectedVersionsArray.getJSONObject(j).getString("name"));
-                }
-                ticket.setAffectedVersion(affectedVersions);
-                ticket.setKey(issue.getString("key"));
-                ticket.setUrl(JIRA_URL + "/browse/" + issue.getString("key"));
-                ticket.setPriorityName(fields.getJSONObject("priority").getString("name"));
-
-                if (fields.has("assignee") && !fields.isNull("assignee")) {
-                    ticket.setAssignee(fields.getJSONObject("assignee").getString("key"));
+                    affectedVersionList.add(affectedVersionsArray.getJSONObject(j).getString("name"));
                 }
 
-                if (fields.has("creator") && !fields.isNull("creator")) {
-                    ticket.setCreator(fields.getJSONObject("creator").getString("key"));
-                }
+                // Ordina in ordine crescente
+                List<String> sortedAffectedVersions = affectedVersionList.stream()
+                        .sorted(new VersionComparator())
+                        .collect(Collectors.toList());
 
-                if (fields.has("reporter") && !fields.isNull("reporter")) {
-                    ticket.setReporter(fields.getJSONObject("reporter").getString("key"));
+                // Scorri in avanti e trova la prima versione valida
+                String selectedAffectedVersion = null;
+                for (String versionName : sortedAffectedVersions) {
+                    if (project.getVersionFromName(versionName) != null) {
+                        selectedAffectedVersion = versionName;
+                        break;
+                    }
                 }
+                ticket.setAffectedVersion(project.getVersionFromName(selectedAffectedVersion));
 
-                ticket.setSummary(fields.getString("summary"));
-                ticket.setDescription(fields.optString("description", null));
-                ticket.setCreated(parseDate(fields.optString("created")));
-                ticket.setUpdated(parseDate(fields.optString("updated")));
-                ticket.setResolutionDate(parseDate(fields.optString("resolutiondate")));
-                ticket.setVotes(fields.getJSONObject("votes").getInt("votes"));
-                ticket.setWatchers(fields.getJSONObject("watches").getInt("watchCount"));
 
                 // Aggiungi il ticket alla lista
                 tickets.add(ticket);
@@ -142,29 +144,7 @@ public class JiraService {
             }
         }
 
-        System.out.println("Totale ticket elaborati: " + tickets.size());
-
-        // Stampa i primi 10 ticket elaborati
-        System.out.println("Primi 10 ticket:");
-        for (int i = 0; i < Math.min(10, tickets.size()); i++) {
-            Ticket ticket = tickets.get(i);
-            System.out.println("Ticket " + (i + 1) + ":");
-            System.out.println("  ID: " + ticket.getId());
-            System.out.println("  Fix Version: " + ticket.getFixVersion());
-            System.out.println("  Affected Versions: " + ticket.getAffectedVersion());
-        }
-
         return tickets;
-    }
-
-    private static Date parseDate(String dateStr) {
-        if (dateStr == null || dateStr.isEmpty()) return null;
-        try {
-            return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").parse(dateStr);
-        } catch (ParseException e) {
-            e.printStackTrace(); // oppure logga meglio se preferisci
-            return null;
-        }
     }
 
 
@@ -204,16 +184,9 @@ public class JiraService {
             for (int i = 0; i < jsonVersions.length(); i++) {
                 JSONObject version = jsonVersions.getJSONObject(i);
                 Version v = new Version();
-                v.setId(version.getString("id"));
                 v.setName(version.getString("name"));
-                v.setArchived(version.getBoolean("archived"));
                 v.setReleased(version.getBoolean("released"));
-                String releaseDate = version.optString("releaseDate", null);
-                if (releaseDate != null && !releaseDate.isEmpty()) {
-                    v.setReleaseDate(LocalDate.parse(releaseDate));
-                }
                 versions.add(v);
-
             }
 
             // Stampa di debug

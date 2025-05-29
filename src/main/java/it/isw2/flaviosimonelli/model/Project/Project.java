@@ -1,62 +1,92 @@
 package it.isw2.flaviosimonelli.model.Project;
 
+import it.isw2.flaviosimonelli.model.Method;
 import it.isw2.flaviosimonelli.model.Ticket;
 import it.isw2.flaviosimonelli.model.Version;
 
 import java.util.List;
 
 public class Project {
+    private String name;
+    private String conventionReleaseTag;
     private String jiraID;
-    private String versionManagerURL;
-    private String directory;
+    private String gitURL;
+    private String gitBranch;
+    private String gitDirectory;
+    private List<Ticket> tickets;
     private List<Version> versions;
-    private List<Ticket> ticketsFixClosed;
-    private String branchName;
+    private List<Method> methods;
 
-    public void setBranchName(String branchName) {
-        this.branchName = branchName;
+    public String getName() {
+        return name;
     }
-    public String getBranchName() {
-        return branchName;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public void setJiraID(String jiraID) {
-        this.jiraID = jiraID;
+    public String getConventionReleaseTag() {
+        return conventionReleaseTag;
+    }
+    public void setConventionReleaseTag(String conventionReleaseTag) {
+        this.conventionReleaseTag = conventionReleaseTag;
     }
 
     public String getJiraID() {
         return jiraID;
     }
-
-    public void setVersions(List<Version> versions) {
-        this.versions = versions;
+    public void setJiraID(String jiraID) {
+        this.jiraID = jiraID;
     }
 
-    public void setVersionManagerURL(String gitURL) {
-        this.versionManagerURL = gitURL;
+    public String getGitURL() {
+        return gitURL;
+    }
+    public void setGitURL(String gitURL) {
+        this.gitURL = gitURL;
     }
 
-    public String getVersionManagerURL() {
-        return versionManagerURL;
+    public String getGitBranch() {
+        return gitBranch;
+    }
+    public void setGitBranch(String gitBranch) {
+        this.gitBranch = gitBranch;
     }
 
-    public void setDirectory(String directory) {
-        this.directory = directory;
+    public String getGitDirectory() {
+        return gitDirectory;
     }
-    public String getDirectory() {
-        return directory;
+    public void setGitDirectory(String gitDirectory) {
+        this.gitDirectory = gitDirectory;
+    }
+
+    public List<Ticket> getTickets() {
+        return tickets;
+    }
+    public void setTickets(List<Ticket> tickets) {
+        this.tickets = tickets;
     }
 
     public List<Version> getVersions() {
         return versions;
     }
-
-    public void setTicketsFixClosed(List<Ticket> ticketsFixClosed) {
-        this.ticketsFixClosed = ticketsFixClosed;
+    public void setVersions(List<Version> versions) {
+        this.versions = versions;
+    }
+    public Version getVersionFromName(String name) {
+        for (Version version : versions) {
+            if (version.getName().equals(name)) {
+                return version;
+            }
+        }
+        return null;
     }
 
-    public List<Ticket> getTicketsFixClosed() {
-        return ticketsFixClosed;
+    public List<Method> getMethods() {
+        return methods;
     }
+    public void setMethods(List<Method> methods) {
+        this.methods = methods;
+    }
+
 }
 

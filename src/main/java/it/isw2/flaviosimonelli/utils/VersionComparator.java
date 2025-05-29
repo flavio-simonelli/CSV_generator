@@ -4,14 +4,10 @@ import it.isw2.flaviosimonelli.model.Version;
 
 import java.util.Comparator;
 
-public class VersionComparator implements Comparator<Version> {
+public class VersionComparator implements Comparator<String> {
 
     @Override
-    public int compare(Version v1, Version v2) {
-        return compareVersions(v1.getName(), v2.getName());
-    }
-
-    private int compareVersions(String v1, String v2) {
+    public int compare(String v1, String v2) {
         String[] parts1 = v1.split("\\.");
         String[] parts2 = v2.split("\\.");
 

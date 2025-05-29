@@ -1,15 +1,17 @@
 package it.isw2.flaviosimonelli.view;
 
 import it.isw2.flaviosimonelli.controller.CreateCSVController;
-import it.isw2.flaviosimonelli.utils.bean.TicketManagerBean;
-import it.isw2.flaviosimonelli.utils.bean.VersionManagerBean;
+import it.isw2.flaviosimonelli.utils.bean.JiraBean;
+import it.isw2.flaviosimonelli.utils.bean.GitBean;
 
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
 import java.util.Scanner;
-import javax.swing.*;
-import java.io.File;
 
 public class ViewCLI {
-    private Scanner scanner;
+    private final Scanner scanner;
+    private static final String CONFIG_FILE_PATH = "config/config.properties";
 
     public ViewCLI() {
         this.scanner = new Scanner(System.in);
@@ -18,78 +20,89 @@ public class ViewCLI {
     // schermata iniziale di avvio tool
     public void start() {
         System.out.println("=== CSV Generator Tool ===");
-        getInfoProject();
+
+        getInfoProject(); // schermata che richiede le informazioni del progetto
+
     }
 
-    // Schermata che prende le informazioni utili per prendere le informazioni del progetto da Git e JIRA
+    // metodo che gestisce le informazioni del progetto
     private void getInfoProject() {
-        System.out.println("=== Inizializzazione Progetto ===");
+        Properties properties = new Properties();
+        String jiraID = null;
+        String conventionReleaseTag = null;
+        String githubUrl = null;
+        String branch = null;
+        String parentDirectory = null;
+        String directory = null;
 
-        // Richiesta informazioni per interazione con JIRA
-        String jiraID = getInput("Inserisci ID del progetto JIRA: ");
-        while (jiraID == null || jiraID.trim().isEmpty()) {
-            System.out.println("ID progetto non valido. Riprova.");
-            jiraID = getInput("Inserisci ID del progetto JIRA: ");
-        }
-        TicketManagerBean ticketManagerBean = new TicketManagerBean(jiraID);
+        do {
+            System.out.println("Per favore assicurati di aver configurato correttamente il file " + CONFIG_FILE_PATH);
+            System.out.println("Premi INVIO quando hai completato la modifica del file properties.");
+            scanner.nextLine();
 
-        // Richiesta informazioni per interazione con Git
-        String choice = getInput("Vuoi clonare un progetto da GitHub o aprirne uno già esistente? (clone/open): ").trim().toLowerCase();
-        while (!choice.equals("clone") && !choice.equals("open")) {
-            System.out.println("Scelta non valida. Riprova.");
-            choice = getInput("Vuoi clonare un progetto da GitHub o aprirne uno già esistente? (clone/open): ").trim().toLowerCase();
-        }
-        VersionManagerBean versionManagerBean = null;
-        if (choice.equals("clone")) {
-            // Informazioni per il clone e del progetto
-            String url = getInput("Inserisci l'URL del repository GitHub: ");
-            while (url == null || url.trim().isEmpty()) {
-                System.out.println("URL non valido. Riprova.");
-                url = getInput("Inserisci l'URL del repository GitHub: ");
+            try (FileInputStream fis = new FileInputStream(CONFIG_FILE_PATH)) {
+                properties.load(fis);
+
+                jiraID = properties.getProperty("jira.id");
+                conventionReleaseTag = properties.getProperty("tag.release.convention", "{VERSION}");
+                githubUrl = properties.getProperty("github.url", "");
+                branch = properties.getProperty("github.branch");
+                parentDirectory = properties.getProperty("local.directory.parent", "");
+                directory = properties.getProperty("local.directory.git", "");
+
+                if ((githubUrl == null || parentDirectory == null) && (directory == null)) {
+                    System.out.println("Errore: il file di configurazione non contiene le informazioni necessarie.");
+                    System.out.println("Se si vuole clonare un repository compilare i campi 'github.url' e 'local.directory.parent'.");
+                    System.out.println("Se si vuole aprire un repository esistente compilare il campo 'local.directory.git'.");
+                    System.out.println("La compilazione di entrambi i campi prediligera la apertura del repository esistente");
+                    return;
+                }
+
+                if (jiraID == null) {
+                    System.out.println("Errore: il file di configurazione non contiene l'ID del progetto JIRA.");
+                    return;
+                }
+
+                if (branch == null) {
+                    System.out.println("Attenzione: il campo 'github.branch' non è stato specificato.");
+                    return;
+                }
+
+                System.out.println("\nConfigurazione caricata:");
+                System.out.println("- Progetto JIRA: " + jiraID);
+                if ( directory != null) {
+                    System.out.println("- Repository Git locale: " + directory);
+                } else {
+                    System.out.println("- Repository GitHub: " + githubUrl);
+                    System.out.println("- Parent directory: " + directory);
+                }
+                System.out.println("- Branch: " + branch);
+                System.out.println("- Convenzione di rilascio: " + conventionReleaseTag);
+
+
+            } catch (IOException e) {
+                System.out.println("Errore durante la lettura del file di configurazione: " + e.getMessage());
+                System.out.println("Assicurati che il file " + CONFIG_FILE_PATH + " esista e sia correttamente formattato.");
             }
-            String branch = getInput("Inserisci il branch desiderato: ");
-            while (branch == null || branch.trim().isEmpty()) {
-                System.out.println("Branch non valido. Riprova.");
-                branch = getInput("Inserisci il branch desiderato: ");
-            }
-            String parentDirectory = scegliCartellaConPopup("Seleziona la parent directory per la clonazione");
-            if (parentDirectory == null) {
-                parentDirectory = scegliCartellaConPopup("Inserisci il parent directory per la clonazione");
-            }
-            versionManagerBean = new VersionManagerBean(url, branch, parentDirectory, choice);
+        } while (!askConfigConfirmation());
+
+        // Creazione dei bean per gestire i ticket e le versioni
+        JiraBean jiraBean = new JiraBean(jiraID);
+        GitBean gitBean;
+        if( directory != null){
+            gitBean = new GitBean(directory, branch, conventionReleaseTag);
         } else {
-            // Informazioni per l'apertura del progetto esistente
-            String directory = scegliCartellaConPopup("Seleziona la cartella del progetto esistente");
-            if (directory == null) {
-                directory = scegliCartellaConPopup("Inserisci la cartella del progetto esistente");
-            }
-            versionManagerBean = new VersionManagerBean(directory, choice);
+            gitBean = new GitBean(githubUrl, parentDirectory, branch, conventionReleaseTag);
         }
-        // Chiamata del controller
-        CreateCSVController controller = new CreateCSVController();
-        controller.createProject(ticketManagerBean, versionManagerBean);
+        // Creazione del controller per la generazione dei CSV
+        CreateCSVController createCSVController = new CreateCSVController();
+        // Creazione del progetto e generazione dei CSV
+        createCSVController.createProject(jiraBean, gitBean);
     }
 
-    private String getInput(String messaggio) {
-        System.out.print(messaggio);
-        return scanner.nextLine();
+    private boolean askConfigConfirmation() {
+        System.out.print("La configurazione è corretta? (y/n): ");
+        String input = scanner.nextLine().trim().toLowerCase();
+        return input.equals("y");
     }
-
-    //interfaccia per selezionare la cartella grafica
-    public String scegliCartellaConPopup(String messaggio) {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setDialogTitle(messaggio);
-        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        chooser.setAcceptAllFileFilterUsed(false);
-
-        int result = chooser.showOpenDialog(null);
-        if (result == JFileChooser.APPROVE_OPTION) {
-            File selectedDir = chooser.getSelectedFile();
-            return selectedDir.getAbsolutePath();
-        } else {
-            System.out.println("Nessuna cartella selezionata.");
-            return null;
-        }
-    }
-
 }

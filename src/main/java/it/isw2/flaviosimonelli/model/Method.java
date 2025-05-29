@@ -7,17 +7,23 @@ import java.util.List;
  * Class to hold method information
  */
 public class Method {
-    private String packageName;
+    private String name;
     private String className;
-    private String methodName;
-    private List<Parameter> parameters;
+    private String path;
+    private String version;
 
-    // getter e setter
-    public String getPackageName() {
-        return packageName;
+    public Method(String name, String className, String path, String version) {
+        this.name = name;
+        this.className = className;
+        this.path = path;
+        this.version = version;
     }
-    public void setPackageName(String packageName) {
-        this.packageName = packageName;
+
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
     }
 
     public String getClassName() {
@@ -27,18 +33,19 @@ public class Method {
         this.className = className;
     }
 
-    public String getMethodName() {
-        return methodName;
+    public String getPath() {
+        return path;
     }
-    public void setMethodName(String methodName) {
-        this.methodName = methodName;
+    public void setPath(String path) {
+        this.path = path;
     }
 
-    public List<Parameter> getParameters() {
-        return parameters;
+    public String getVersion() {
+        return version;
     }
-    public void setParameters(List<Parameter> parameters) {
-        this.parameters = parameters;
+    public void setVersion(String version) {
+        this.version = version;
     }
+
 
 }
