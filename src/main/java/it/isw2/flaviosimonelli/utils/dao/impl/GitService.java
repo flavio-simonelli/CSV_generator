@@ -3,6 +3,7 @@ package it.isw2.flaviosimonelli.utils.dao.impl;
 
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import it.isw2.flaviosimonelli.model.Method;
 import it.isw2.flaviosimonelli.model.Project.Project;
@@ -91,18 +92,18 @@ public class GitService {
     }
 
     /**
-     * Ottienel la lista dei metodi di un commit specifico
+     * Ottiene la lista dei metodi di un commit specifico
      */
     public static List<Method> getMethodsInCommit(String repoPath, String commitHash, String commitName) throws Exception {
         List<Method> methods = new ArrayList<>();
 
-        try (Repository repository = Git.open(new File(repoPath)).getRepository();
+        try (
+             Repository repository = Git.open(new File(repoPath)).getRepository();
              Git git = new Git(repository);
              RevWalk walk = new RevWalk(repository)) {
-
-            ObjectId commitId = repository.resolve(commitHash);
-            RevCommit commit = walk.parseCommit(commitId);
-            ObjectId treeId = commit.getTree().getId();
+                ObjectId commitId = repository.resolve(commitHash);
+                RevCommit commit = walk.parseCommit(commitId);
+                ObjectId treeId = commit.getTree().getId();
 
             try (TreeWalk treeWalk = new TreeWalk(repository)) {
                 treeWalk.addTree(treeId);
@@ -111,6 +112,12 @@ public class GitService {
 
                 while (treeWalk.next()) {
                     String path = treeWalk.getPathString();
+
+                    // Escludi con precisione i file nella cartella src/test/
+                    if (path.contains("/src/test/") || path.contains("\\src\\test\\")) {
+                        continue;
+                    }
+
                     ObjectId objectId = treeWalk.getObjectId(0);
                     ObjectLoader loader = repository.open(objectId);
 
@@ -124,12 +131,15 @@ public class GitService {
                         continue; // ignora file non validi
                     }
 
-                    String className = cu.getPrimaryTypeName().orElse("UnknownClass");
+                    for (ClassOrInterfaceDeclaration classDecl : cu.findAll(ClassOrInterfaceDeclaration.class)) {
+                        String className = classDecl.getNameAsString();
 
-                    for (MethodDeclaration method : cu.findAll(MethodDeclaration.class)) {
-                        String signature = method.getDeclarationAsString(false, false, false);
-                        methods.add(new Method(signature, className, path, commitName));
+                        for (MethodDeclaration method : classDecl.getMethods()) {
+                            String signature = method.getDeclarationAsString(false, false, false);
+                            methods.add(new Method(signature, className, path, commitName));
+                        }
                     }
+
                 }
             }
         }

@@ -65,6 +65,7 @@ public class CsvExporter {
             List<Version> versions = project.getVersions();
             for (Version version : versions) {
                 List<Method> methods = version.getMethods();
+                System.out.println("Numero di metodi per la versione " + version.getName() + ": " + (methods != null ? methods.size() : 0));
                 if (methods != null) {
                     for (Method method : methods) {
                         writer.append(version.getName())
