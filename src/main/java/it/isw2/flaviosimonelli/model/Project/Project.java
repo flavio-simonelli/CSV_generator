@@ -1,7 +1,5 @@
 package it.isw2.flaviosimonelli.model.Project;
 
-import it.isw2.flaviosimonelli.model.AnalyzedMethod;
-import it.isw2.flaviosimonelli.model.Method;
 import it.isw2.flaviosimonelli.model.Ticket;
 import it.isw2.flaviosimonelli.model.Version;
 

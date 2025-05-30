@@ -1,6 +1,7 @@
 package it.isw2.flaviosimonelli.model;
 
 import java.util.List;
+import it.isw2.flaviosimonelli.model.method.Method;
 
 public class Version {
     private String name; // e.g., "1.0.0"
