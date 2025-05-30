@@ -1,5 +1,6 @@
 package it.isw2.flaviosimonelli.model.Project;
 
+import it.isw2.flaviosimonelli.model.AnalyzedMethod;
 import it.isw2.flaviosimonelli.model.Method;
 import it.isw2.flaviosimonelli.model.Ticket;
 import it.isw2.flaviosimonelli.model.Version;
@@ -15,7 +16,6 @@ public class Project {
     private String gitDirectory;
     private List<Ticket> tickets;
     private List<Version> versions;
-    private List<Method> methods;
 
     public String getName() {
         return name;
@@ -79,13 +79,6 @@ public class Project {
             }
         }
         return null;
-    }
-
-    public List<Method> getMethods() {
-        return methods;
-    }
-    public void setMethods(List<Method> methods) {
-        this.methods = methods;
     }
 
 }

@@ -35,8 +35,10 @@ public class ProjectRepository {
 
     // Il metodo di creazione del progetto tramite clone del repository Git (se utilizzassimo più progetti dovremmo sostituire nell if una ricerca tramite ID)
     public Project cloneProject(String JiraID, String gitHubURL, String branch, String parentDirectory, String conventionReleaseTag) {
+        System.out.println("Cloning project");
         project = new Project();
         String projectName = extractGitHubProjectName(gitHubURL);
+        System.out.println(projectName);
         if (projectName == null) {
             System.err.println("Errore: URL GitHub non valido o non riconosciuto.");
             // TODO: lancia una eccezione
@@ -55,12 +57,21 @@ public class ProjectRepository {
         // Chiamata al dato per riceve informazioni sul progetto
         project.setVersions(getVersions());
         project.setTickets(getTickets());
+        // ricava i metodi
+        for (Version version : project.getVersions()) {
+            try {
+                version.setMethods(gitService.getMethodsInCommit(project.getGitDirectory(), version.getHashCommit(), version.getName()));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
 
         return project;
     }
 
     // Il metodo di creazione del progetto tramite apertura del repository Git (se utilizzassimo più progetti dovremmo sostituire nell if una ricerca tramite ID)
     public Project openProject(String JiraID, String directory, String conventionReleaseTag) {
+        System.out.println("Opening project in directory: " + directory);
         project = new Project();
         project.setName(extractDirectoryName(directory));
         project.setGitDirectory(directory);
@@ -136,6 +147,7 @@ public class ProjectRepository {
 
     // Metodo per estrarre il nome del progetto da url github
     private static String extractGitHubProjectName(String url) {
+        System.out.println("extractGitHubProjectName: " + url);
         if (url == null) return null;
         // Rimuove .git finale se presente
         url = url.replaceAll("\\.git$", "");

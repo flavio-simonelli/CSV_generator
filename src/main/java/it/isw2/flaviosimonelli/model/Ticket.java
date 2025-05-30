@@ -1,25 +1,45 @@
 package it.isw2.flaviosimonelli.model;
 
-import java.util.Date;
-import java.util.List;
+import java.time.LocalDateTime;
 
-    public class Ticket {
-        private Version fixVersion; // version in which the issue is fixed
-        private Version affectedVersion; // first version in which the issue is present
+/**
+ * Represents a ticket/issue from a tracking system like Jira.
+ */
+public class Ticket {
+    private Version fixVersion;             // Version in which the issue is fixed
+    private Version affectedVersion;        // First version in which the issue is present
+    private LocalDateTime createDate;       // When the ticket was created
+    private LocalDateTime resolvedDate;     // When the ticket was resolved
 
-        public void setFixVersion(Version fixVersion) {
-            this.fixVersion = fixVersion;
-        }
-        public Version getFixVersion() {
-            return fixVersion;
-        }
-
-        public void setAffectedVersion(Version affectedVersion) {
-            this.affectedVersion = affectedVersion;
-        }
-        public Version getAffectedVersion() {
-            return affectedVersion;
-        }
-
-
+    public Version getFixVersion() {
+        return fixVersion;
     }
+
+    public void setFixVersion(Version fixVersion) {
+        this.fixVersion = fixVersion;
+    }
+
+    public Version getAffectedVersion() {
+        return affectedVersion;
+    }
+
+    public void setAffectedVersion(Version affectedVersion) {
+        this.affectedVersion = affectedVersion;
+    }
+
+    public LocalDateTime getCreateDate() {
+        return createDate;
+    }
+
+    public void setCreateDate(LocalDateTime createDate) {
+        this.createDate = createDate;
+    }
+
+    public LocalDateTime getResolvedDate() {
+        return resolvedDate;
+    }
+
+    public void setResolvedDate(LocalDateTime resolvedDate) {
+        this.resolvedDate = resolvedDate;
+    }
+}

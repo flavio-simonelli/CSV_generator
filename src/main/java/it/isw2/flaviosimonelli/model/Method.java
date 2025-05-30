@@ -1,29 +1,26 @@
 package it.isw2.flaviosimonelli.model;
 
-import java.lang.reflect.Parameter;
-import java.util.List;
-
 /**
  * Class to hold method information
  */
 public class Method {
-    private String name;
+    private String signature;
     private String className;
     private String path;
     private String version;
 
-    public Method(String name, String className, String path, String version) {
-        this.name = name;
+    public Method(String signature, String className, String path, String version) {
+        this.signature = signature;
         this.className = className;
         this.path = path;
         this.version = version;
     }
 
-    public String getName() {
-        return name;
+    public String getSignature() {
+        return signature;
     }
-    public void setName(String name) {
-        this.name = name;
+    public void setSignature(String signature) {
+        this.signature = signature;
     }
 
     public String getClassName() {

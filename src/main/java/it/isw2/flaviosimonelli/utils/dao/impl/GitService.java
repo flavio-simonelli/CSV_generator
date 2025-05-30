@@ -5,6 +5,7 @@ import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import it.isw2.flaviosimonelli.model.AnalyzedMethod;
 import it.isw2.flaviosimonelli.model.Method;
 import it.isw2.flaviosimonelli.model.Project.Project;
 

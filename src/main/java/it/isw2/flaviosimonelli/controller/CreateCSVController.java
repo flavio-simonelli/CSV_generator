@@ -5,9 +5,6 @@ import it.isw2.flaviosimonelli.utils.CsvExporter;
 import it.isw2.flaviosimonelli.model.Project.ProjectRepository;
 import it.isw2.flaviosimonelli.utils.bean.GitBean;
 import it.isw2.flaviosimonelli.utils.bean.JiraBean;
-import it.isw2.flaviosimonelli.utils.dao.impl.GitService;
-
-import java.io.IOException;
 
 
 public class CreateCSVController {
@@ -16,12 +13,12 @@ public class CreateCSVController {
         // creazione del progetto model
         ProjectRepository projectRepository = ProjectRepository.getInstance();
         // decidiamo se clonare il repository o aprirlo
-        if (gitBean.getDirectory() != null){
+        if (gitBean.getLocalPath() != null && !gitBean.getLocalPath().isEmpty()) {
             // apertura del repository nella directory locale
-            projectRepository.openProject(jiraBean.getJiraID(), gitBean.getDirectory(), gitBean.getConventionReleaseTag());
+            projectRepository.openProject(jiraBean.getJiraId(), gitBean.getLocalPath(), gitBean.getReleaseTagFormat());
         } else {
             // clonazione del repository nella directory locale
-            projectRepository.cloneProject(jiraBean.getJiraID(), gitBean.getURL(), gitBean.getBranch(), gitBean.getParentDirectory(), gitBean.getConventionReleaseTag());
+            projectRepository.cloneProject(jiraBean.getJiraId(), gitBean.getRemoteUrl(), gitBean.getBranch(), gitBean.getParentDirectory(), gitBean.getReleaseTagFormat());
         }
         printCSV();
         return true;
@@ -35,11 +32,8 @@ public class CreateCSVController {
         // esportazione delle versioni in CSV
         CsvExporter.writeVersionsToCsv(project.getVersions(), "result/version_"+project.getName()+".csv");
         // esportazione dei metodi in CSV
-        try {
-            CsvExporter.writeMethodsToCsv(project, "result/methods_"+project.getName()+".csv");
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        CsvExporter.writeMethodsToCsv(project, "result/methods_"+project.getName()+".csv");
+
         return true;
     }
 
