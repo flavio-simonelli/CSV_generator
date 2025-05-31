@@ -23,6 +23,7 @@ public class CreateCSVController {
         // initialization versions and tickets
         initializeVersions(project);
         initializeTickets(project);
+        initializeMethods(project);
         printCSV();
         return true;
     }
@@ -31,7 +32,7 @@ public class CreateCSVController {
         // contatta il servizio Jira per ottenere le versioni del progetto
         JiraService jiraService = new JiraService();
         GitService gitService = new GitService();
-        List<Version> versions = null;
+        List<Version> versions;
         try {
             versions = jiraService.getVersions(project);
         } catch (SystemException e) {
@@ -60,6 +61,18 @@ public class CreateCSVController {
             project.setTickets(jiraService.getFixedBugTickets(project));
         } catch (SystemException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void initializeMethods(Project project) {
+        // contatta il servizio Git per ottenere i metodi del progetto
+        GitService gitService = new GitService();
+        for (Version version : project.getVersions()) {
+            try {
+                version.setMethods(gitService.getMethodsInVersion(project, version));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 

@@ -94,12 +94,11 @@ public class GitService {
     /**
      * Ottiene la lista dei metodi di un commit specifico
      */
-    public static List<Method> getMethodsInVersion(Project project, Version version) throws Exception {
+    public List<Method> getMethodsInVersion(Project project, Version version) throws Exception {
         List<Method> methods = new ArrayList<>();
 
         try (
              Repository repository = Git.open(new File(project.getGitDirectory())).getRepository();
-             Git git = new Git(repository);
              RevWalk walk = new RevWalk(repository)) {
                 ObjectId commitId = repository.resolve(version.getHashCommit());
                 RevCommit commit = walk.parseCommit(commitId);
