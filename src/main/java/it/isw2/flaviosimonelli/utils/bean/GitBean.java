@@ -7,9 +7,8 @@ package it.isw2.flaviosimonelli.utils.bean;
 public class GitBean {
     private final RepositoryType type;
     private final String remoteUrl;
-    private final String localPath;
+    private final String path;
     private final String branch;
-    private final String parentDirectory;
     private final String releaseTagFormat;
 
     /**
@@ -31,8 +30,7 @@ public class GitBean {
     public GitBean(String remoteUrl, String parentDirectory, String branch, String releaseTagFormat) {
         this.type = RepositoryType.REMOTE;
         this.remoteUrl = remoteUrl;
-        this.parentDirectory = parentDirectory;
-        this.localPath = null;
+        this.path = parentDirectory;
         this.branch = branch;
         this.releaseTagFormat = releaseTagFormat;
     }
@@ -46,11 +44,10 @@ public class GitBean {
      */
     public GitBean(String localPath, String branch, String releaseTagFormat) {
         this.type = RepositoryType.LOCAL;
-        this.localPath = localPath;
+        this.path = localPath;
         this.branch = branch;
         this.releaseTagFormat = releaseTagFormat;
         this.remoteUrl = null;
-        this.parentDirectory = null;
     }
 
     public String getBranch() {
@@ -61,12 +58,8 @@ public class GitBean {
         return remoteUrl;
     }
 
-    public String getLocalPath() {
-        return localPath;
-    }
-
-    public String getParentDirectory() {
-        return parentDirectory;
+    public String getPath() {
+        return path;
     }
 
     public String getReleaseTagFormat() {

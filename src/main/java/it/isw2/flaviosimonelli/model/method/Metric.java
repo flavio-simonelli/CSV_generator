@@ -1,18 +1,34 @@
 package it.isw2.flaviosimonelli.model.method;
 
-/**
- * Interface for defining metrics that can be associated with methods.
- *
- * @param <T> The type of the metric value
- */
-public interface Metric<T> {
-    /**
-     * @return The name of the metric
-     */
-    String name();
+public record Metric(
+        int loc,
+        int statementsCount,
+        int cyclomaticComplexity,
+        int cognitiveComplexity,
 
-    /**
-     * @return The class representing the type of the metric value
-     */
-    Class<T> getType();
-}
+        double halsteadVolume,
+        double halsteadDifficulty,
+        double halsteadEffort,
+
+        int nestingDepth,
+        int numberOfBranches,
+        int numberOfCodeSmells,
+        int parameterCount,
+        int duplication,
+
+        int methodHistories,
+        int authors,
+        int stmtAdded,
+        int maxStmtAdded,
+        double avgStmtAdded,
+        int stmtDeleted,
+        int maxStmtDeleted,
+        double avgStmtDeleted,
+        int churn,
+        int maxChurn,
+        double avgChurn,
+        int cond,
+        int elseAdded,
+        int elseDeleted
+) {}
+

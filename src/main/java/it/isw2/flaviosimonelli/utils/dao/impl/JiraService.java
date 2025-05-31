@@ -17,17 +17,33 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+/**
+ * Service for interacting with the Jira REST API.
+ * Provides methods to retrieve project information, versions and tickets.
+ */
 public class JiraService {
-    private final String JIRA_URL = "https://issues.apache.org/jira/rest/api/2";
-    private final int MAX_RESULTS_PER_PAGE = 100; // Imposta un limite massimo di risultati per pagina
+    private static final Logger LOGGER = Logger.getLogger(JiraService.class.getName());
+    private static final String JIRA_URL = "https://issues.apache.org/jira/rest/api/2";
+    private static final int MAX_RESULTS_PER_PAGE = 100;
 
-    // Funzione che esegue la richiesta e ottiene il JSON con supporto alla paginazione
+    /**
+     * Retrieves JSON data from Jira API with pagination support.
+     *
+     * @param jql JQL query string
+     * @param startAt Starting index for pagination
+     * @param maxResults Maximum results to return per page
+     * @return JSONObject containing API response
+     * @throws IOException If connection fails
+     * @throws JSONException If parsing fails
+     * @throws URISyntaxException If URL is malformed
+     */
     private JSONObject getJsonFromJira(String jql, int startAt, int maxResults) throws IOException, JSONException, URISyntaxException {
         String url = JIRA_URL + "/search/?jql=" + jql + "&startAt=" + startAt + "&maxResults=" + maxResults;
-        // Stampa l'URL per debug
-        System.out.println("URL: " + url);
+        LOGGER.info("URL: " + url);
 
         URI uri = new URI(url);
         HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
@@ -38,16 +54,20 @@ public class JiraService {
             throw new IOException("Failed to get a valid response from JIRA. HTTP response code: " + responseCode);
         }
 
-        StringBuilder response = ReadResponse(connection);
-
-        return new JSONObject(response.toString()); // Restituisce il JSON ottenuto dalla risposta
+        String response = readResponseFromConnection(connection);
+        return new JSONObject(response);
     }
 
-    // Funzione che traduce il risultato JSON in una lista di Ticket
+    /**
+     * Gets a list of fixed bug tickets for a project.
+     *
+     * @param project The project to query
+     * @return List of Ticket objects
+     * @throws SystemException If API calls fail
+     */
     public List<Ticket> getFixedBugTickets(Project project) throws SystemException {
         String projName = project.getJiraID();
-        // Costruisci la query JQL
-        String Jql = "project%20%3D%20" + projName + "%20AND%20issuetype%20%3D%20Bug%20AND%20status%20in%20%28Resolved%2C%20Closed%29%20AND%20resolution%20%3D%20Fixed%20ORDER%20BY%20fixVersion%20ASC";
+        String jql = buildFixedBugsJql(projName);
 
         List<Ticket> tickets = new ArrayList<>();
         int startAt = 0;
@@ -55,162 +75,202 @@ public class JiraService {
         int processedIssues = 0;
         boolean hasMorePages = true;
 
-        // Loop per gestire la paginazione
         while (hasMorePages) {
-            // Ottieni il JSON dalla risposta API per la pagina corrente
-            JSONObject jsonResponse;
             try {
-                jsonResponse = getJsonFromJira(Jql, startAt, MAX_RESULTS_PER_PAGE);
-            } catch (JSONException | IOException | URISyntaxException e) {
-                SystemException exception = new SystemException(e.getMessage());
-                exception.initCause(e);
-                throw exception;
-            }
+                JSONObject jsonResponse = getJsonFromJira(jql, startAt, MAX_RESULTS_PER_PAGE);
 
-            // Ottieni informazioni di paginazione dal JSON
-            totalIssues = jsonResponse.getInt("total");
-            JSONArray issues = jsonResponse.getJSONArray("issues");
-            int currentPageSize = issues.length();
+                // Parse pagination info
+                totalIssues = jsonResponse.getInt("total");
+                JSONArray issues = jsonResponse.getJSONArray("issues");
+                int currentPageSize = issues.length();
 
-            if (startAt == 0) {
-                System.out.println("Numero totale di ticket trovati: " + totalIssues);
-            }
+                logPaginationInfo(startAt, currentPageSize, totalIssues);
 
-            System.out.println("Elaborazione ticket da " + (startAt + 1) + " a " + (startAt + currentPageSize) + " di " + totalIssues);
+                // Process tickets from current page
+                processTicketsFromJson(issues, tickets, project);
 
-            // Elabora i ticket della pagina corrente
-            for (int i = 0; i < currentPageSize; i++) {
-                JSONObject issue = issues.getJSONObject(i);
-                Ticket ticket = new Ticket();
-                JSONObject fields = issue.getJSONObject("fields");
-
-                // Gestion fixVersion
-                JSONArray fixVersions = fields.getJSONArray("fixVersions");
-                // estrazione del nome delle versioni fix versions
-                List<String> fixVersionList = new ArrayList<>();
-                for (int j = 0; j < fixVersions.length(); j++) {
-                    fixVersionList.add(fixVersions.getJSONObject(j).getString("name"));
-                }
-                // Ordina la lista delle fix version in ordine crescente
-                List<String> sortedFixVersions = fixVersionList.stream()
-                        .sorted(new VersionComparator())
-                        .collect(Collectors.toList());
-
-                // Scorri all'indietro e trova la versione valida
-                String selectedFixVersion = null;
-                for (int j = sortedFixVersions.size() - 1; j >= 0; j--) {
-                    String versionName = sortedFixVersions.get(j);
-                    if (project.getVersionFromName(versionName) != null) {
-                        selectedFixVersion = versionName;
-                        break;
-                    }
-                }
-                ticket.setFixVersion(project.getVersionFromName(selectedFixVersion));
-
-                // Gestione affectedVersions
-                JSONArray affectedVersionsArray = fields.getJSONArray("versions");
-                List<String> affectedVersionList = new ArrayList<>();
-                for (int j = 0; j < affectedVersionsArray.length(); j++) {
-                    affectedVersionList.add(affectedVersionsArray.getJSONObject(j).getString("name"));
-                }
-
-                // Ordina in ordine crescente
-                List<String> sortedAffectedVersions = affectedVersionList.stream()
-                        .sorted(new VersionComparator())
-                        .collect(Collectors.toList());
-
-                // Scorri in avanti e trova la prima versione valida
-                String selectedAffectedVersion = null;
-                for (String versionName : sortedAffectedVersions) {
-                    if (project.getVersionFromName(versionName) != null) {
-                        selectedAffectedVersion = versionName;
-                        break;
-                    }
-                }
-                ticket.setAffectedVersion(project.getVersionFromName(selectedAffectedVersion));
-
-
-                // Aggiungi il ticket alla lista
-                tickets.add(ticket);
-            }
-
-            processedIssues += currentPageSize;
-
-            // Verifica se ci sono altre pagine da elaborare
-            if (processedIssues >= totalIssues || currentPageSize == 0) {
-                hasMorePages = false;
-            } else {
+                // Update pagination variables
+                processedIssues += currentPageSize;
+                hasMorePages = processedIssues < totalIssues && currentPageSize > 0;
                 startAt += currentPageSize;
+
+            } catch (JSONException | IOException | URISyntaxException e) {
+                LOGGER.log(Level.SEVERE, "Error fetching tickets", e);
+                throw new SystemException("Error fetching tickets: " + e.getMessage(), e);
             }
         }
 
         return tickets;
     }
 
+    /**
+     * Creates JQL query for fixed bugs.
+     *
+     * @param projectName The Jira project ID
+     * @return URL encoded JQL query string
+     */
+    private String buildFixedBugsJql(String projectName) {
+        return "project%20%3D%20" + projectName +
+                "%20AND%20issuetype%20%3D%20Bug%20AND%20status%20in%20" +
+                "%28Resolved%2C%20Closed%29%20AND%20resolution%20%3D%20Fixed%20" +
+                "ORDER%20BY%20fixVersion%20ASC";
+    }
 
     /**
-     * Recupera tutte le versioni di un progetto da JIRA.
+     * Logs pagination information.
      *
-     * @param project modello del progetto
-     * @return Lista di stringhe contenenti i nomi delle versioni
-     * @throws SystemException Se si verificano errori durante la chiamata API
+     * @param startAt Starting index
+     * @param currentPageSize Current page size
+     * @param totalIssues Total issues count
      */
-    public List<Version> getVersionProject(Project project) throws SystemException {
+    private void logPaginationInfo(int startAt, int currentPageSize, int totalIssues) {
+        if (startAt == 0) {
+            LOGGER.info("Total tickets found: " + totalIssues);
+        }
+        LOGGER.info("Processing tickets from " + (startAt + 1) +
+                " to " + (startAt + currentPageSize) + " of " + totalIssues);
+    }
+
+    /**
+     * Processes JSON issues and converts them to Ticket objects.
+     *
+     * @param issues JSON array of issues
+     * @param tickets List to add tickets to
+     * @param project Current project
+     */
+    private void processTicketsFromJson(JSONArray issues, List<Ticket> tickets, Project project) {
+        for (int i = 0; i < issues.length(); i++) {
+            JSONObject issue = issues.getJSONObject(i);
+            JSONObject fields = issue.getJSONObject("fields");
+
+            Ticket ticket = new Ticket();
+
+            // Handle fixVersions
+            JSONArray fixVersions = fields.getJSONArray("fixVersions");
+            Version fixVersion = findMatchingVersion(project, fixVersions, false);
+            ticket.setFixVersion(fixVersion);
+
+            // Handle affectedVersions
+            JSONArray affectedVersions = fields.getJSONArray("versions");
+            Version affectedVersion = findMatchingVersion(project, affectedVersions, true);
+            ticket.setAffectedVersion(affectedVersion);
+
+            tickets.add(ticket);
+        }
+    }
+
+    /**
+     * Finds matching version from JSON versions array.
+     *
+     * @param project Current project
+     * @param versionsArray JSON array containing versions
+     * @param findFirst If true, finds first valid version; if false, finds last valid version
+     * @return Matching Version object or null if none found
+     */
+    private Version findMatchingVersion(Project project, JSONArray versionsArray, boolean findFirst) {
+        List<String> versionNames = extractVersionNames(versionsArray);
+
+        List<String> sortedVersions = versionNames.stream()
+                .sorted(new VersionComparator())
+                .collect(Collectors.toList());
+
+        if (findFirst) {
+            // Find first valid version (for affected versions)
+            for (String versionName : sortedVersions) {
+                Version version = project.getVersionFromName(versionName);
+                if (version != null) {
+                    return version;
+                }
+            }
+        } else {
+            // Find last valid version (for fix versions)
+            for (int i = sortedVersions.size() - 1; i >= 0; i--) {
+                Version version = project.getVersionFromName(sortedVersions.get(i));
+                if (version != null) {
+                    return version;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extracts version names from JSON array.
+     *
+     * @param versionsArray JSON array containing version objects
+     * @return List of version name strings
+     */
+    private List<String> extractVersionNames(JSONArray versionsArray) {
+        List<String> versionNames = new ArrayList<>();
+        for (int i = 0; i < versionsArray.length(); i++) {
+            versionNames.add(versionsArray.getJSONObject(i).getString("name"));
+        }
+        return versionNames;
+    }
+
+    /**
+     * Retrieves all versions for a project from Jira.
+     *
+     * @param project The project model
+     * @return List of Version objects
+     * @throws SystemException If API calls fail
+     */
+    public List<Version> getVersions(Project project) throws SystemException {
         List<Version> versions = new ArrayList<>();
         String projName = project.getJiraID();
+        String url = JIRA_URL + "/project/" + projName + "/versions";
 
         try {
-            // Costruisci l'endpoint per le versioni del progetto
-            String url = JIRA_URL + "/project/" + projName + "/versions";
+            LOGGER.info("URL request http: " + url);
 
-            // Stampa l'URL per debug
-            System.out.println("URL request http: " + url);
-
-            // Effettua la chiamata HTTP
             URI uri = new URI(url);
             HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
             connection.setRequestMethod("GET");
 
             int responseCode = connection.getResponseCode();
             if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw new IOException("Risposta non valida da JIRA. Codice: " + responseCode);
+                throw new IOException("Invalid response from JIRA. Code: " + responseCode);
             }
 
-            // Leggi la risposta
-            StringBuilder response = ReadResponse(connection);
+            String response = readResponseFromConnection(connection);
+            JSONArray jsonVersions = new JSONArray(response);
 
-            // Elabora il JSONArray restituito
-            JSONArray jsonVersions = new JSONArray(response.toString());
             for (int i = 0; i < jsonVersions.length(); i++) {
-                JSONObject version = jsonVersions.getJSONObject(i);
-                Version v = new Version();
-                v.setName(version.getString("name"));
-                v.setReleased(version.getBoolean("released"));
-                versions.add(v);
+                JSONObject versionJson = jsonVersions.getJSONObject(i);
+                Version version = new Version();
+                version.setName(versionJson.getString("name"));
+                version.setReleased(versionJson.getBoolean("released"));
+                versions.add(version);
             }
 
-            // Stampa di debug
-            System.out.println("Trovate " + versions.size() + " versioni per il progetto " + projName);
-
+            LOGGER.info("Found " + versions.size() + " versions for project " + projName);
 
         } catch (JSONException | IOException | URISyntaxException e) {
-            SystemException exception = new SystemException("Errore durante il recupero delle versioni: " + e.getMessage());
-            exception.initCause(e);
-            throw exception;
+            LOGGER.log(Level.SEVERE, "Error retrieving versions", e);
+            throw new SystemException("Error retrieving versions: " + e.getMessage(), e);
         }
 
         return versions;
     }
 
-    private StringBuilder ReadResponse(HttpURLConnection connection) throws IOException {
-        BufferedReader in = new BufferedReader(
-                new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
-        StringBuilder response = new StringBuilder();
-        String inputLine;
-        while ((inputLine = in.readLine()) != null) {
-            response.append(inputLine);
+    /**
+     * Reads response from an HTTP connection.
+     *
+     * @param connection The HTTP connection
+     * @return Response as string
+     * @throws IOException If reading fails
+     */
+    private String readResponseFromConnection(HttpURLConnection connection) throws IOException {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+
+            StringBuilder response = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+            return response.toString();
         }
-        in.close();
-        return response;
     }
 }

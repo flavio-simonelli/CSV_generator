@@ -7,6 +7,8 @@ import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import it.isw2.flaviosimonelli.model.Project.Project;
 
+import it.isw2.flaviosimonelli.model.Version;
+import it.isw2.flaviosimonelli.model.method.Method;
 import it.isw2.flaviosimonelli.utils.VersionTagger;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -35,13 +37,14 @@ public class GitService {
 
     /**
      * Clone repository
-     * @param project istanza del progetto contenente l'URL del repository e la directory di destinazione
+     * @param project instance of the project to clone
      */
     public void cloneRepository(Project project) {
         try {
             // Clone the repository
             Git.cloneRepository()
                 .setURI(project.getGitURL())
+                .setBranch(project.getGitBranch())
                 .setDirectory(new File(project.getGitDirectory()))
                 .call();
             System.out.println("Repository cloned to: " + project.getGitDirectory());
@@ -51,8 +54,8 @@ public class GitService {
     }
 
     /**
-     * Apre un repository Git esistente
-     * @param project istanza del progetto contenente il percorso del repository
+     * Check open an existing repository
+     * @param project istance of the project to open
      */
     public void openRepository(Project project) {
         try {
@@ -66,15 +69,13 @@ public class GitService {
 
     /**
      * Ottiene il commit corrispettivo a una versione specifica
-     * @param directory percorso della directory del repository
-     * @param conventionTagName nome della convenzione del tag per le versioni
      * @param version nome della versione di cui ottenere il commit
      * @return l'ID del commit corrispondente alla versione specificata
      */
-    public String getCommitByVersion(String directory, String conventionTagName ,String version) {
+    public String getCommitByVersion(Project project, Version version) {
         // Applica la versione sulla convenzione del tag
-        String versionTag = VersionTagger.applyVersion(conventionTagName, version);
-        try (Git git = Git.open(new File(directory))) {
+        String versionTag = VersionTagger.applyVersion(project.getReleaseTagFormat(), version.getName());
+        try (Git git = Git.open(new File(project.getGitDirectory()))) {
             // Ottiene il commit corrispondente alla versione specificata
             Ref ref = git.getRepository().findRef(versionTag);
             if (ref != null) {
@@ -93,14 +94,14 @@ public class GitService {
     /**
      * Ottiene la lista dei metodi di un commit specifico
      */
-    public static List<Method> getMethodsInCommit(String repoPath, String commitHash, String commitName) throws Exception {
+    public static List<Method> getMethodsInVersion(Project project, Version version) throws Exception {
         List<Method> methods = new ArrayList<>();
 
         try (
-             Repository repository = Git.open(new File(repoPath)).getRepository();
+             Repository repository = Git.open(new File(project.getGitDirectory())).getRepository();
              Git git = new Git(repository);
              RevWalk walk = new RevWalk(repository)) {
-                ObjectId commitId = repository.resolve(commitHash);
+                ObjectId commitId = repository.resolve(version.getHashCommit());
                 RevCommit commit = walk.parseCommit(commitId);
                 ObjectId treeId = commit.getTree().getId();
 
@@ -135,7 +136,7 @@ public class GitService {
 
                         for (MethodDeclaration method : classDecl.getMethods()) {
                             String signature = method.getDeclarationAsString(false, false, false);
-                            methods.add(new Method(signature, className, path, commitName));
+                            methods.add(new Method(signature, className, path, version.getName()));
                         }
                     }
 

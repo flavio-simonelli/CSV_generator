@@ -6,27 +6,36 @@ import it.isw2.flaviosimonelli.model.Version;
 import java.util.List;
 
 public class Project {
-    private String name;
-    private String conventionReleaseTag;
-    private String jiraID;
-    private String gitURL;
-    private String gitBranch;
-    private String gitDirectory;
-    private List<Ticket> tickets;
-    private List<Version> versions;
+    private String name; // name of the project, usually the name of the Git repository
+    private String jiraID; // ID of the project in Jira, used to retrieve tickets
+    private String gitURL; // URL of the Git repository, used to clone or open the repository
+    private String gitBranch; // Branch of the Git repository to work with
+    private String gitDirectory; // Directory where the Git repository is located or will be cloned
+    private String releaseTagFormat; // Convention for release tags, e.g. "v{VERSION}" or "release-{VERSION}"
+    private List<Ticket> tickets; // List of tickets associated with the project, retrieved from Jira
+    private List<Version> versions; // List of versions associated with the project
 
+    // Constructor for creating a new project with all necessary parameters (without tickets and versions)
+    public Project(String name, String jiraID, String gitURL, String gitBranch, String gitDirectory, String releaseTagFormat) {
+        this.name = name;
+        this.jiraID = jiraID;
+        this.gitURL = gitURL;
+        this.gitBranch = gitBranch;
+        this.gitDirectory = gitDirectory;
+        this.releaseTagFormat = releaseTagFormat;
+    }
+
+    // Default constructor for creating an empty project
+    public Project() {
+        // Empty constructor for creating an empty project
+    }
+
+    // Getters and Setters for all fields
     public String getName() {
         return name;
     }
     public void setName(String name) {
         this.name = name;
-    }
-
-    public String getConventionReleaseTag() {
-        return conventionReleaseTag;
-    }
-    public void setConventionReleaseTag(String conventionReleaseTag) {
-        this.conventionReleaseTag = conventionReleaseTag;
     }
 
     public String getJiraID() {
@@ -79,5 +88,6 @@ public class Project {
         return null;
     }
 
+    public String getReleaseTagFormat() { return releaseTagFormat; }
 }
 

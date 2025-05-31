@@ -3,3 +3,43 @@ Possibili metriche che possono essere analizzate:
 2. quante righe sono state modificate di quel metodo
 3. quante sviluppatori hanno modificato il metodo
 4. Se il commit ha portato ad un refactoring del nome del
+
+
+
+    // Metodo per estrarre le versioni in JIra
+    private List<Version> getVersions() {
+        JiraService jiraService = new JiraService();
+        GitService gitService = new GitService();
+        List<Version> versions = null;
+        List<Version> validVersions = new ArrayList<Version>();
+        try {
+            versions = jiraService.getVersionProject(project);
+            for (Version version : versions) {
+                // Estrazione del commit corrispondente alla versione
+                String hashCommit = gitService.getCommitByVersion(project.getGitDirectory(), project.getConventionReleaseTag(), version.getName());
+                if (hashCommit == null) {
+                    // Se il tag non esiste, rimuove la versione dalla lista
+                    System.out.println("Versione " + version.getName() + " non trovata nel repository Git. Rimuovendo dalla lista.");
+                } else {
+                    // Imposta l'hash del commit per la versione
+                    version.setHashCommit(hashCommit);
+                    validVersions.add(version);
+                }
+            }
+        } catch (SystemException e) {
+            e.printStackTrace();
+        }
+        return validVersions;
+    }
+
+    // Metodo per estrarre i ticket in Jira
+    private List<Ticket> getTickets() {
+        JiraService jiraService = new JiraService();
+        List<Ticket> tickets = null;
+        try {
+            tickets = jiraService.getFixedBugTickets(project);
+        } catch (SystemException e) {
+            e.printStackTrace();
+        }
+        return tickets;
+    }

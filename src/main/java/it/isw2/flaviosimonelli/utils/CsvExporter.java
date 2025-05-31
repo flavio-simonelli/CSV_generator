@@ -5,7 +5,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
 
-import it.isw2.flaviosimonelli.model.Method;
+import it.isw2.flaviosimonelli.model.method.Method;
 import it.isw2.flaviosimonelli.model.Project.Project;
 import it.isw2.flaviosimonelli.model.Version;
 import it.isw2.flaviosimonelli.model.Ticket;
