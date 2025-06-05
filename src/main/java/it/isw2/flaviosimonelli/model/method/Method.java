@@ -12,6 +12,7 @@ public class Method {
     private final String version;      // The version of the project al quale appartiene il metodo
     private final String content;
     private final Metric metric;       // The metrics associated with this method
+    private Boolean Buggy; // Indicates if the method is buggy or not, default is false
 
     /**
      * Constructs a new Method object with all required information.
@@ -28,6 +29,7 @@ public class Method {
         this.content = content;
         this.version = version;
         this.metric = metric;
+        this.Buggy = false; // Default value for Buggy
     }
 
     /**
@@ -45,6 +47,7 @@ public class Method {
         this.version = version;
         this.content = content;
         this.metric = new Metric(); // Initialize with default metrics
+        this.Buggy = false; // Default value for Buggy
     }
 
     /**
@@ -99,5 +102,23 @@ public class Method {
      */
     public Metric getMetric() {
         return metric;
+    }
+
+    /**
+     * Returns whether the method is considered buggy.
+     *
+     * @return true if the method is buggy, false otherwise
+     */
+    public Boolean isBuggy() {
+        return Buggy;
+    }
+
+    /**
+     * Sets whether the method is considered buggy.
+     *
+     * @param buggy true if the method is buggy, false otherwise
+     */
+    public void setBuggy(Boolean buggy) {
+        this.Buggy = buggy;
     }
 }

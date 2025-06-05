@@ -40,11 +40,13 @@ public class CsvExporter {
         ensureParentDirectoryExists(filePath);
 
         try (FileWriter writer = new FileWriter(filePath)) {
-            writer.append("fixVersion,affectedVersion\n");
+            writer.append("id,fixVersion,affectedVersion,methods\n");
 
             for (Ticket ticket : tickets) {
-                writer.append(escapeCsv(ticket.getFixVersion() != null ? ticket.getFixVersion().getName() : "")).append(",")
+                writer.append(escapeCsv(ticket.getId())).append(",")
+                        .append(escapeCsv(ticket.getFixVersion() != null ? ticket.getFixVersion().getName() : "")).append(",")
                         .append(escapeCsv(ticket.getAffectedVersion() != null ? ticket.getAffectedVersion().getName() : ""))
+                        .append(escapeCsv(ticket.getNameMethodsBuggy() != null ? String.join(";", ticket.getNameMethodsBuggy()) : ""))
                         .append("\n");
             }
             System.out.println("CSV scritto con successo: " + filePath);

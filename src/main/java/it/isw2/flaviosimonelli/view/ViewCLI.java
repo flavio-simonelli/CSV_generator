@@ -172,7 +172,7 @@ public class ViewCLI {
         GitBean gitBean = createGitBean(config);
 
         CreateCSVController controller = new CreateCSVController();
-        controller.createProject(jiraBean, gitBean);
+        controller.createCSV(jiraBean, gitBean);
     }
 
     /**

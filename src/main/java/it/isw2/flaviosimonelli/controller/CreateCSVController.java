@@ -2,8 +2,10 @@ package it.isw2.flaviosimonelli.controller;
 
 import it.isw2.flaviosimonelli.model.Project.Project;
 import it.isw2.flaviosimonelli.model.Project.ProjectFactory;
+import it.isw2.flaviosimonelli.model.Ticket;
 import it.isw2.flaviosimonelli.model.Version;
 import it.isw2.flaviosimonelli.utils.CsvExporter;
+import it.isw2.flaviosimonelli.utils.VersionComparator;
 import it.isw2.flaviosimonelli.utils.bean.GitBean;
 import it.isw2.flaviosimonelli.utils.bean.JiraBean;
 import it.isw2.flaviosimonelli.utils.dao.impl.GitService;
@@ -11,6 +13,7 @@ import it.isw2.flaviosimonelli.utils.dao.impl.JiraService;
 import it.isw2.flaviosimonelli.utils.exception.SystemException;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -34,7 +37,7 @@ public class CreateCSVController {
      * @param gitBean Configuration for Git access
      * @return true if project creation and data processing succeeded
      */
-    public boolean createProject(JiraBean jiraBean, GitBean gitBean) {
+    public boolean createCSV(JiraBean jiraBean, GitBean gitBean) {
         try {
             // Create project through factory
             ProjectFactory projectFactory = ProjectFactory.getInstance();
@@ -104,9 +107,10 @@ public class CreateCSVController {
      * @param project The project to process
      * @throws SystemException If an error occurs during ticket retrieval
      */
-    private void initializeTickets(Project project) throws SystemException {
+    private void initializeTickets(Project project) throws Exception {
         JiraService jiraService = new JiraService();
         project.setTickets(jiraService.getFixedBugTickets(project));
+        filterTickets(project);
     }
 
     /**
@@ -121,6 +125,39 @@ public class CreateCSVController {
             version.setMethods(gitService.getMethodsInVersion(project, version));
         }
     }
+
+    private void filterTickets(Project project) throws Exception {
+        GitService gitService = new GitService();
+        VersionComparator comparator = new VersionComparator();
+
+        Iterator<Ticket> it = project.getTickets().iterator();
+        while (it.hasNext()) {
+            Ticket ticket = it.next();
+
+            String fixCommitHash = gitService.findFixCommitForTicket(project, ticket.getId());
+            if (fixCommitHash == null) {
+                LOGGER.info("Ticket " + ticket.getId() + " has no fix commit, removing it.");
+                it.remove();  // Rimozione sicura usando Iterator
+                continue;
+            }
+            ticket.setFixVersion(gitService.getVersionForCommit(project, fixCommitHash));
+            ticket.setNameMethodsBuggy(gitService.getModifiedMethodSignaturesfromCommit(project, fixCommitHash));
+
+            if (ticket.getFixVersion() == null) {
+                LOGGER.info("Ticket " + ticket.getId() + " is corrupted, removing it.");
+                it.remove();  // Rimozione sicura usando Iterator
+            } else {
+
+                // Check if affected version is valid
+                if (ticket.getAffectedVersion() != null && comparator.compare(ticket.getAffectedVersion().getName(), ticket.getFixVersion().getName()) > 0) {
+                    ticket.setAffectedVersion(null);
+                }
+            }
+        }
+    }
+
+
+
 
     /**
      * Exports all project data to CSV files.

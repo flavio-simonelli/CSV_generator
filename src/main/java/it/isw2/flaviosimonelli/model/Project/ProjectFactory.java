@@ -25,7 +25,6 @@ public class ProjectFactory {
     // Method to create a new project with the given parameters
     public Project CreateProject(Boolean localRepository, String jiraID, String gitURL, String gitBranch, String gitDirectory, String releaseTagFormat) {
         GitService gitService = new GitService();
-        JiraService jiraService = new JiraService();
         if (localRepository == false) {
             project = new Project(extractGitHubProjectName(gitURL), jiraID, gitURL, gitBranch, gitDirectory + "/" + extractGitHubProjectName(gitURL), releaseTagFormat);
             // Clone the Git repository

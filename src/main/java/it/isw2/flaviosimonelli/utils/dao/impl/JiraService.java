@@ -145,10 +145,8 @@ public class JiraService {
 
             Ticket ticket = new Ticket();
 
-            // Handle fixVersions
-            JSONArray fixVersions = fields.getJSONArray("fixVersions");
-            Version fixVersion = findMatchingVersion(project, fixVersions, false);
-            ticket.setFixVersion(fixVersion);
+            // Set ticket ID
+            ticket.setId(issue.getString("key"));
 
             // Handle affectedVersions
             JSONArray affectedVersions = fields.getJSONArray("versions");
