@@ -9,7 +9,8 @@ public class Method {
     private final String signature;    // The method signature (name and parameters)
     private final String className;    // The name of the class containing this method
     private final String path;         // The source file path
-    private final String version;      // The version of the method, if applicable (e.g., for versioned APIs)
+    private final String version;      // The version of the project al quale appartiene il metodo
+    private final String content;
     private final Metric metric;       // The metrics associated with this method
 
     /**
@@ -20,10 +21,11 @@ public class Method {
      * @param path      The source file path
      * @param metric    The metrics associated with this method
      */
-    public Method(String signature, String className, String path, String version, Metric metric) {
+    public Method(String signature, String className, String path, String content, String version, Metric metric) {
         this.signature = signature;
         this.className = className;
         this.path = path;
+        this.content = content;
         this.version = version;
         this.metric = metric;
     }
@@ -36,13 +38,13 @@ public class Method {
      * @param path      The source file path
      * @param version   The version of the method, if applicable (e.g., for versioned APIs)
      */
-    public Method(String signature, String className, String path, String version) {
+    public Method(String signature, String className, String path, String version, String content) {
         this.signature = signature;
         this.className = className;
         this.path = path;
         this.version = version;
-        this.metric = null;
-        //this.metric = new Metric(); // Initialize with default metrics
+        this.content = content;
+        this.metric = new Metric(); // Initialize with default metrics
     }
 
     /**
@@ -70,6 +72,15 @@ public class Method {
      */
     public String getPath() {
         return path;
+    }
+
+    /**
+     * Returns the content of the method.
+     *
+     * @return The content of the method
+     */
+    public String getContent() {
+        return content;
     }
 
     /**

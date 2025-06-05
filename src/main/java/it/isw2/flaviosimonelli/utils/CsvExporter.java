@@ -54,7 +54,7 @@ public class CsvExporter {
     }
 
     /**
-     * Esporta tutti i metodi di ogni versione del progetto in un file CSV
+     * Esporta tutti i metodi di ogni versione del progetto in un file CSV, incluse le metriche non nulle
      * @param project progetto contenente le versioni e i metodi
      * @param filePath percorso dove salvare il file CSV
      */
@@ -62,7 +62,8 @@ public class CsvExporter {
         ensureParentDirectoryExists(filePath);
 
         try (FileWriter writer = new FileWriter(filePath)) {
-            writer.append("Version,ClassName,MethodName,FilePath\n");
+            // Intestazione con le colonne delle metriche
+            writer.append("Version,ClassName,MethodName,FilePath,LOC,StatementsCount,CyclomaticComplexity\n");
 
             List<Version> versions = project.getVersions();
             for (Version version : versions) {
@@ -74,7 +75,12 @@ public class CsvExporter {
                         writer.append(escapeCsv(version.getName())).append(",")
                                 .append(escapeCsv(method.getClassName())).append(",")
                                 .append(escapeCsv(method.getSignature())).append(",")
-                                .append(escapeCsv(method.getPath())).append("\n");
+                                .append(escapeCsv(method.getPath())).append(",");
+
+                        // Aggiungi le metriche, lasciando il campo vuoto se la metrica è zero
+                        writer.append(method.getMetric().getLoc() > 0 ? String.valueOf(method.getMetric().getLoc()) : "").append(",")
+                                .append(method.getMetric().getStatementsCount() > 0 ? String.valueOf(method.getMetric().getStatementsCount()) : "").append(",")
+                                .append(method.getMetric().getCyclomaticComplexity() > 0 ? String.valueOf(method.getMetric().getCyclomaticComplexity()) : "").append("\n");
                     }
                 }
             }
