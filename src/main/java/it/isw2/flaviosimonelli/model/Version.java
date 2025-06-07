@@ -1,11 +1,13 @@
 package it.isw2.flaviosimonelli.model;
 
+import java.util.Date;
 import java.util.List;
 import it.isw2.flaviosimonelli.model.method.Method;
 
 public class Version {
     private String name; // e.g., "1.0.0"
     private boolean released; // true if the version is released, false otherwise
+    private Date releaseDate; // date of release, null if not released
     private String hashCommit; // hash of the tag associated with this version
     private List<Method> methods; // list of methods associated with this version
 
@@ -14,6 +16,13 @@ public class Version {
     }
     public String getName() {
         return name;
+    }
+
+    public void setReleaseDate(Date releaseDate) {
+        this.releaseDate = releaseDate;
+    }
+    public Date getReleaseDate() {
+        return releaseDate;
     }
 
     public void setReleased(boolean released) {

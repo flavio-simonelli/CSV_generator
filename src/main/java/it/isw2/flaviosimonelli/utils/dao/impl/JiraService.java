@@ -15,6 +15,9 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -139,6 +142,7 @@ public class JiraService {
      * @param project Current project
      */
     private void processTicketsFromJson(JSONArray issues, List<Ticket> tickets, Project project) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
         for (int i = 0; i < issues.length(); i++) {
             JSONObject issue = issues.getJSONObject(i);
             JSONObject fields = issue.getJSONObject("fields");
@@ -147,6 +151,10 @@ public class JiraService {
 
             // Set ticket ID
             ticket.setId(issue.getString("key"));
+
+            // Set open date
+            String createdDate = fields.getString("created");
+            ticket.setOpenDate(ZonedDateTime.parse(createdDate, formatter));
 
             // Handle affectedVersions
             JSONArray affectedVersions = fields.getJSONArray("versions");

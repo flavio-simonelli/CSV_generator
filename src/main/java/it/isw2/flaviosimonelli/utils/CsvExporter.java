@@ -40,12 +40,14 @@ public class CsvExporter {
         ensureParentDirectoryExists(filePath);
 
         try (FileWriter writer = new FileWriter(filePath)) {
-            writer.append("id,fixVersion,affectedVersion,methods\n");
+            writer.append("TicketID,CommitHash,OpenVerision,FixVersion,AffectedVersion,NameMethodsBuggy\n");
 
             for (Ticket ticket : tickets) {
                 writer.append(escapeCsv(ticket.getId())).append(",")
+                        .append(escapeCsv(ticket.getCommitHash() != null ? ticket.getCommitHash() : "")).append(",")
+                        .append(escapeCsv(ticket.getOpenVersion() != null ? ticket.getOpenVersion().getName() : "")).append(",")
                         .append(escapeCsv(ticket.getFixVersion() != null ? ticket.getFixVersion().getName() : "")).append(",")
-                        .append(escapeCsv(ticket.getAffectedVersion() != null ? ticket.getAffectedVersion().getName() : ""))
+                        .append(escapeCsv(ticket.getAffectedVersion() != null ? ticket.getAffectedVersion().getName() : "")).append(",")
                         .append(escapeCsv(ticket.getNameMethodsBuggy() != null ? String.join(";", ticket.getNameMethodsBuggy()) : ""))
                         .append("\n");
             }
@@ -65,7 +67,7 @@ public class CsvExporter {
 
         try (FileWriter writer = new FileWriter(filePath)) {
             // Intestazione con le colonne delle metriche
-            writer.append("Version,ClassName,MethodName,FilePath,LOC,StatementsCount,CyclomaticComplexity\n");
+            writer.append("Version,ClassName,MethodName,FilePath,LOC,StatementsCount,CyclomaticComplexity,buggy\n");
 
             List<Version> versions = project.getVersions();
             for (Version version : versions) {
@@ -82,7 +84,10 @@ public class CsvExporter {
                         // Aggiungi le metriche, lasciando il campo vuoto se la metrica è zero
                         writer.append(method.getMetric().getLoc() > 0 ? String.valueOf(method.getMetric().getLoc()) : "").append(",")
                                 .append(method.getMetric().getStatementsCount() > 0 ? String.valueOf(method.getMetric().getStatementsCount()) : "").append(",")
-                                .append(method.getMetric().getCyclomaticComplexity() > 0 ? String.valueOf(method.getMetric().getCyclomaticComplexity()) : "").append("\n");
+                                .append(method.getMetric().getCyclomaticComplexity() > 0 ? String.valueOf(method.getMetric().getCyclomaticComplexity()) : "").append(",");
+
+                        // Aggiungi il flag buggy, se il metodo è buggy
+                        writer.append(method.isBuggy() ? "true" : "false").append("\n");
                     }
                 }
             }

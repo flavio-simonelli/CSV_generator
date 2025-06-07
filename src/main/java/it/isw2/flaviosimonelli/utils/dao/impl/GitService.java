@@ -204,6 +204,24 @@ public class GitService {
     }
 
     /**
+     * Ottiene la data di commit per un commit specifico.
+     *
+     * @param commitHash L'hash del commit di cui ottenere la data
+     * @return La data del commit, o null se non trovata
+     */
+    public Date getCommitDate(Project project, String commitHash) {
+        try (Git git = Git.open(new File(project.getGitDirectory()))) {
+            RevWalk walk = new RevWalk(git.getRepository());
+            ObjectId commitId = git.getRepository().resolve(commitHash);
+            RevCommit commit = walk.parseCommit(commitId);
+            return new Date(commit.getCommitTime() * 1000L);
+        } catch (IOException e) {
+            LOGGER.error("Failed to get commit date for " + commitHash, e);
+            return null;
+        }
+    }
+
+    /**
      * Calcola la versione del progetto per un determinato commit.
      * @param project Il progetto per cui calcolare la versione
      * @param commitId L'ID del commit per cui calcolare la versione
@@ -281,21 +299,6 @@ public class GitService {
             e.printStackTrace();
             return null;
         }
-    }
-
-    // Funzione helper per calcolare distanza tra due commit (start -> end)
-    private int getDistance(RevWalk revWalk, RevCommit start, RevCommit end) throws IOException {
-        revWalk.reset();
-        revWalk.setRevFilter(RevFilter.ALL);
-        revWalk.markStart(end);
-        int distance = 0;
-        for (RevCommit c : revWalk) {
-            if (c.equals(start)) {
-                return distance;
-            }
-            distance++;
-        }
-        return Integer.MAX_VALUE; // start non raggiungibile da end
     }
 
 
