@@ -5,7 +5,9 @@ import org.slf4j.LoggerFactory;
 
 public class Main {
     public static void main(String[] args) {
-        System.out.println("SLF4J implementation: " + LoggerFactory.getILoggerFactory().getClass().getName());
+        // Disabilita log jgit
+        ch.qos.logback.classic.Logger jgitLogger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger("org.eclipse.jgit");
+        jgitLogger.setLevel(ch.qos.logback.classic.Level.ERROR);
 
         new ViewCLI().start();
     }
