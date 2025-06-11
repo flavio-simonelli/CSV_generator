@@ -2,7 +2,7 @@ package it.isw2.flaviosimonelli.utils.dao.impl;
 
 import it.isw2.flaviosimonelli.model.Project.Project;
 import it.isw2.flaviosimonelli.model.Version;
-import it.isw2.flaviosimonelli.utils.NameVersionComparator;
+import it.isw2.flaviosimonelli.utils.Comparator.NameVersionComparator;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -158,7 +158,7 @@ public class JiraService {
             // Handle affectedVersions
             JSONArray affectedVersions = fields.getJSONArray("versions");
             Version affectedVersion = findMatchingVersion(project, affectedVersions, true);
-            ticket.setAffectedVersion(affectedVersion);
+            ticket.setInjectedVersion(affectedVersion);
 
             tickets.add(ticket);
         }

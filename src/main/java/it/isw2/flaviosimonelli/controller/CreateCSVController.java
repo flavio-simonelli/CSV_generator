@@ -6,8 +6,7 @@ import it.isw2.flaviosimonelli.model.Ticket;
 import it.isw2.flaviosimonelli.model.Version;
 import it.isw2.flaviosimonelli.model.method.Method;
 import it.isw2.flaviosimonelli.utils.CsvExporter;
-import it.isw2.flaviosimonelli.utils.NameVersionComparator;
-import it.isw2.flaviosimonelli.utils.VersionComparator;
+import it.isw2.flaviosimonelli.utils.Comparator.VersionComparator;
 import it.isw2.flaviosimonelli.utils.bean.GitBean;
 import it.isw2.flaviosimonelli.utils.bean.JiraBean;
 import it.isw2.flaviosimonelli.utils.dao.impl.GitService;
@@ -15,10 +14,8 @@ import it.isw2.flaviosimonelli.utils.dao.impl.JiraService;
 import it.isw2.flaviosimonelli.utils.exception.SystemException;
 
 
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -49,14 +46,13 @@ public class CreateCSVController {
             Project project = projectFactory.CreateProject(
                                 gitBean.isLocalRepository(),
                                 jiraBean.getJiraId(),
+                                jiraBean.getApproachProportion(),
                                 gitBean.getRemoteUrl(),
                                 gitBean.getBranch(),
                                 gitBean.getPath(),
                                 gitBean.getReleaseTagFormat());
-
-            initializeVersions(project);
-            initializeTickets(project);
-            initializeMethods(project);
+            // propotion
+            proportion(project);
             // Labeling
             labeling(project);
 
@@ -75,7 +71,7 @@ public class CreateCSVController {
         List<Version> versions = project.getVersions();
 
         for (Ticket ticket : tickets) {
-            Version injectedVersion = ticket.getAffectedVersion();
+            Version injectedVersion = ticket.getInjectedVersion();
             Version fixVersion = ticket.getFixVersion();
             List<String> buggyMethodSignatures = ticket.getNameMethodsBuggy();
 
@@ -123,127 +119,6 @@ public class CreateCSVController {
     }
 
     /**
-     * Retrieves and filters versions from Jira that also exist as Git tags.
-     *
-     * @param project The project to process
-     * @throws SystemException If an error occurs during version retrieval
-     */
-    private void initializeVersions(Project project) throws SystemException {
-        JiraService jiraService = new JiraService();
-        List<Version> versions = jiraService.getVersions(project);
-        List<Version> validVersions = filterValidVersions(project, versions);
-        // ordina le versioni in ordine cronologico
-        validVersions.sort(new VersionComparator());
-
-        project.setVersions(validVersions);
-    }
-
-    /**
-     * Filters versions to keep only those that have corresponding Git tags.
-     *
-     * @param project The project being processed
-     * @param versions List of versions to filter
-     * @return List of valid versions with commit hashes
-     */
-    private List<Version> filterValidVersions(Project project, List<Version> versions) {
-        GitService gitService = new GitService();
-        List<Version> validVersions = new ArrayList<>();
-
-        for (Version version : versions) {
-            String hashCommit = gitService.getCommitByVersion(project, version);
-
-            if (hashCommit == null) {
-                LOGGER.info("Version " + version.getName() + " not found in Git repository. Removing from list.");
-            } else {
-                version.setHashCommit(hashCommit);
-                Date commitDate = gitService.getCommitDate(project, hashCommit);
-                if (commitDate != null) {
-                    version.setReleaseDate(commitDate);
-                }
-                validVersions.add(version);
-            }
-        }
-
-        return validVersions;
-    }
-
-    /**
-     * Retrieves all fixed bug tickets from Jira for the project.
-     *
-     * @param project The project to process
-     * @throws SystemException If an error occurs during ticket retrieval
-     */
-    private void initializeTickets(Project project) throws Exception {
-        JiraService jiraService = new JiraService();
-        project.setTickets(jiraService.getFixedBugTickets(project));
-        setOpeningVersionForTickets(project);
-        filterTickets(project);
-        proportion(project);
-    }
-
-    private void setOpeningVersionForTickets(Project project) {
-        GitService gitService = new GitService();
-        for (Ticket ticket : project.getTickets()) {
-            ZonedDateTime openDate = ticket.getOpenDate();
-            if (openDate != null) {
-                // Find the first version that was released before the ticket's open date
-                for (Version version : project.getVersions()) {
-                    if (version.getReleaseDate() != null && version.getReleaseDate().before(Date.from(openDate.toInstant()))) {
-                        ticket.setOpenVersion(version);
-                        break; // Found the opening version, no need to continue
-                    }
-                }
-            } else {
-                LOGGER.warning("Ticket " + ticket.getId() + " has no open date, cannot determine opening version.");
-            }
-        }
-    }
-
-    /**
-     * Retrieves method information for each version of the project from Git.
-     *
-     * @param project The project to process
-     * @throws Exception If an error occurs during method extraction
-     */
-    private void initializeMethods(Project project) throws Exception {
-        GitService gitService = new GitService();
-        for (Version version : project.getVersions()) {
-            version.setMethods(gitService.getMethodsInVersion(project, version));
-        }
-    }
-
-    private void filterTickets(Project project) throws Exception {
-        GitService gitService = new GitService();
-        NameVersionComparator comparator = new NameVersionComparator();
-
-        Iterator<Ticket> it = project.getTickets().iterator();
-        while (it.hasNext()) {
-            Ticket ticket = it.next();
-
-            String fixCommitHash = gitService.findFixCommitForTicket(project, ticket.getId());
-            if (fixCommitHash == null) {
-                LOGGER.info("Ticket " + ticket.getId() + " has no fix commit, removing it.");
-                it.remove();  // Rimozione sicura usando Iterator
-                continue;
-            }
-            ticket.setCommitHash(fixCommitHash);
-            ticket.setFixVersion(gitService.getVersionForCommit(project, fixCommitHash));
-            ticket.setNameMethodsBuggy(gitService.getModifiedMethodSignaturesfromCommit(project, fixCommitHash));
-
-            if (ticket.getFixVersion() == null) {
-                LOGGER.info("Ticket " + ticket.getId() + " is corrupted, removing it.");
-                it.remove();  // Rimozione sicura usando Iterator
-            } else {
-
-                // Check if affected version is valid
-                if (ticket.getAffectedVersion() != null && comparator.compare(ticket.getAffectedVersion().getName(), ticket.getFixVersion().getName()) > 0) {
-                    ticket.setAffectedVersion(null);
-                }
-            }
-        }
-    }
-
-    /**
      * Calcola il valore di proporzione P per il progetto e predice la Injected Version
      * per i ticket che non ne hanno una.
      * Formula: P = (FV - IV) / (FV - OV)
@@ -255,12 +130,12 @@ public class CreateCSVController {
     private void proportion(Project project) {
         List<Ticket> tickets = project.getTickets();
         List<Version> versions = project.getVersions();
-        int p = completeApprochPropotion(tickets, versions);
+        int p = completeApproachPropotion(tickets, versions);
         LOGGER.info("Proporzione P calcolata: " + p);
         for (Ticket ticket : tickets) {
             Version fixVersion = ticket.getFixVersion();
             Version openVersion = ticket.getOpenVersion();
-            Version affectedVersion = ticket.getAffectedVersion();
+            Version affectedVersion = ticket.getInjectedVersion();
 
             if (affectedVersion == null && fixVersion != null && openVersion != null) {
                 // Calcola la versione iniettata usando la proporzione P
@@ -274,7 +149,7 @@ public class CreateCSVController {
                     if (ivIndex >= versions.size()) ivIndex = versions.size() - 1; // Assicurati che l'indice non superi la dimensione della lista
 
                     Version injectedVersion = versions.get(ivIndex);
-                    ticket.setAffectedVersion(injectedVersion);
+                    ticket.setInjectedVersion(injectedVersion);
                     LOGGER.info("Ticket " + ticket.getId() + " ha una versione iniettata predetta: " + injectedVersion.getName());
                 } else {
                     LOGGER.warning("Non è possibile calcolare la versione iniettata per il ticket " + ticket.getId());
@@ -285,13 +160,13 @@ public class CreateCSVController {
 
     }
 
-    private int completeApprochPropotion(List<Ticket> tickets, List<Version> versions) {
+    private int completeApproachPropotion(List<Ticket> tickets, List<Version> versions) {
         List<Double> pValues = new ArrayList<>();
         // Calcola i valori di P per ogni ticket
         for (Ticket ticket : tickets) {
             Version fixVersion = ticket.getFixVersion();
             Version openVersion = ticket.getOpenVersion();
-            Version affectedVersion = ticket.getAffectedVersion();
+            Version affectedVersion = ticket.getInjectedVersion();
 
             if (fixVersion == null || openVersion == null || affectedVersion == null) {
                 continue;

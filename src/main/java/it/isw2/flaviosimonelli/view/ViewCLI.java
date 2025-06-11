@@ -17,10 +17,8 @@ import java.util.logging.Logger;
  */
 public class ViewCLI {
     private static final Logger LOGGER = Logger.getLogger(ViewCLI.class.getName());
+
     private static final String CONFIG_FILE_PATH = "config/config.properties";
-    private static final String CONFIG_ERROR_MESSAGE = "Errore durante la lettura del file di configurazione: %s";
-    private static final String CONFIG_MISSING_MESSAGE =
-            "Assicurati che il file %s esista e sia correttamente formattato.";
 
     private final Scanner scanner;
     private final Properties properties;
@@ -39,18 +37,21 @@ public class ViewCLI {
     public void start() {
         LOGGER.info("Starting CSV Generator Tool");
         System.out.println("=== CSV Generator Tool ===");
-        processProjectConfiguration();
+        InfoProjectView();
     }
 
     /**
      * Handles the project configuration workflow.
      * Loads configuration, validates it, and creates the project.
      */
-    private void processProjectConfiguration() {
+    private void InfoProjectView() {
+        LOGGER.info("Processing project configuration");
         ConfigurationData config = null;
 
         do {
-            displayConfigurationInstructions();
+            System.out.println("Per favore assicurati di aver configurato correttamente il file " + CONFIG_FILE_PATH);
+            System.out.println("Premi INVIO quando hai completato la modifica del file properties.");
+            scanner.nextLine();
             config = loadConfiguration();
 
             if (config != null) {
@@ -61,14 +62,6 @@ public class ViewCLI {
         createProject(config);
     }
 
-    /**
-     * Displays instructions for configuring the application.
-     */
-    private void displayConfigurationInstructions() {
-        System.out.println("Per favore assicurati di aver configurato correttamente il file " + CONFIG_FILE_PATH);
-        System.out.println("Premi INVIO quando hai completato la modifica del file properties.");
-        scanner.nextLine();
-    }
 
     /**
      * Loads and validates the configuration from the properties file.
@@ -86,18 +79,45 @@ public class ViewCLI {
             config.branch = properties.getProperty("github.branch");
             config.parentDirectory = properties.getProperty("local.directory.parent", "");
             config.directory = properties.getProperty("local.directory.git", "");
+            config.approachProportion = ApproachProportion.fromString(properties.getProperty("approach.proportion", "COMPLETE"));
 
             if (!validateConfiguration(config)) {
-                return null;
+                throw new RuntimeException("Invalid configuration");
             }
 
             return config;
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Failed to load configuration", e);
-            System.out.printf((CONFIG_ERROR_MESSAGE) + "%n", e.getMessage());
-            System.out.printf((CONFIG_MISSING_MESSAGE) + "%n", CONFIG_FILE_PATH);
+            System.out.printf("Errore durante la lettura del file di configurazione: %s" + "%n", e.getMessage());
+            System.out.printf("Assicurati che il file %s esista e sia correttamente formattato." + "%n", CONFIG_FILE_PATH);
+            return null;
+        } catch (RuntimeException e) {
+            LOGGER.log(Level.WARNING, "Configuration validation failed", e);
+            System.out.println("Errore nella configurazione: " + e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Displays a summary of the loaded configuration.
+     *
+     * @param config The configuration to display
+     */
+    private void displayConfigurationSummary(ConfigurationData config) {
+        LOGGER.info("Displaying configuration summary, please review and confirm");
+        System.out.println("\nConfigurazione caricata:");
+        System.out.println("- Progetto JIRA: " + config.jiraID);
+
+        if (config.directory != null && !config.directory.isEmpty()) {
+            System.out.println("- Repository Git locale: " + config.directory);
+        } else {
+            System.out.println("- Repository GitHub: " + config.githubUrl);
+            System.out.println("- Parent directory: " + config.parentDirectory);
+        }
+
+        System.out.println("- Branch: " + config.branch);
+        System.out.println("- Convenzione di rilascio: " + config.conventionReleaseTag);
+        System.out.println("- Approach proportion: " + config.approachProportion);
     }
 
     /**
@@ -132,26 +152,6 @@ public class ViewCLI {
     }
 
     /**
-     * Displays a summary of the loaded configuration.
-     *
-     * @param config The configuration to display
-     */
-    private void displayConfigurationSummary(ConfigurationData config) {
-        System.out.println("\nConfigurazione caricata:");
-        System.out.println("- Progetto JIRA: " + config.jiraID);
-
-        if (config.directory != null && !config.directory.isEmpty()) {
-            System.out.println("- Repository Git locale: " + config.directory);
-        } else {
-            System.out.println("- Repository GitHub: " + config.githubUrl);
-            System.out.println("- Parent directory: " + config.parentDirectory);
-        }
-
-        System.out.println("- Branch: " + config.branch);
-        System.out.println("- Convenzione di rilascio: " + config.conventionReleaseTag);
-    }
-
-    /**
      * Asks the user to confirm the configuration.
      *
      * @return true if the user confirms, false otherwise
@@ -168,35 +168,28 @@ public class ViewCLI {
      * @param config The configuration to use for project creation
      */
     private void createProject(ConfigurationData config) {
-        JiraBean jiraBean = new JiraBean(config.jiraID);
-        GitBean gitBean = createGitBean(config);
-
-        CreateCSVController controller = new CreateCSVController();
-        controller.createCSV(jiraBean, gitBean);
-    }
-
-    /**
-     * Creates a GitBean based on the configuration.
-     *
-     * @param config The configuration to use
-     * @return A configured GitBean instance
-     */
-    private GitBean createGitBean(ConfigurationData config) {
+        JiraBean jiraBean = new JiraBean(config.jiraID, ApproachProportion.toString(config.approachProportion));
+        GitBean gitBean = null;
         if (config.directory != null && !config.directory.isEmpty()) {
-            return new GitBean(
+            gitBean = new GitBean(
                     config.directory,
                     config.branch,
                     config.conventionReleaseTag
             );
         } else {
-            return new GitBean(
+            gitBean = new GitBean(
                     config.githubUrl,
                     config.parentDirectory,
                     config.branch,
                     config.conventionReleaseTag
             );
         }
+
+        CreateCSVController controller = new CreateCSVController();
+        controller.createCSV(jiraBean, gitBean);
     }
+
+
 
     /**
      * Inner class to hold configuration data.
@@ -208,5 +201,36 @@ public class ViewCLI {
         String branch;
         String parentDirectory;
         String directory;
+        ApproachProportion approachProportion;
+    }
+
+    /**
+     * Inner ENUM for ApproachPropotion Attribute.
+     */
+    private enum ApproachProportion {
+        COMPLETE,
+        CENTRAL_SLIDING_WINDOW;
+
+        public static ApproachProportion fromString(String value) {
+            if (value == null) return COMPLETE;
+            switch (value.toUpperCase()) {
+                case "CENTRAL_SLIDING_WINDOW":
+                    return CENTRAL_SLIDING_WINDOW;
+                case "COMPLETE":
+                default:
+                    return COMPLETE;
+            }
+        }
+
+        public static String toString(ApproachProportion value) {
+            if (value == null) return "COMPLETE";
+            switch (value) {
+                case CENTRAL_SLIDING_WINDOW:
+                    return "CENTRAL_SLIDING_WINDOW";
+                case COMPLETE:
+                default:
+                    return "COMPLETE";
+            }
+        }
     }
 }

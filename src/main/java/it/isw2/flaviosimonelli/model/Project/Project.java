@@ -8,6 +8,7 @@ import java.util.List;
 public class Project {
     private String name; // name of the project, usually the name of the Git repository
     private String jiraID; // ID of the project in Jira, used to retrieve tickets
+    private ApproachProportion approachProportion; // Approach for the proportion applied to the ticket in a project
     private String gitURL; // URL of the Git repository, used to clone or open the repository
     private String gitBranch; // Branch of the Git repository to work with
     private String gitDirectory; // Directory where the Git repository is located or will be cloned
@@ -16,9 +17,10 @@ public class Project {
     private List<Version> versions; // List of versions associated with the project
 
     // Constructor for creating a new project with all necessary parameters (without tickets and versions)
-    public Project(String name, String jiraID, String gitURL, String gitBranch, String gitDirectory, String releaseTagFormat) {
+    public Project(String name, String jiraID, ApproachProportion approachProportion, String gitURL, String gitBranch, String gitDirectory, String releaseTagFormat) {
         this.name = name;
         this.jiraID = jiraID;
+        this.approachProportion = approachProportion;
         this.gitURL = gitURL;
         this.gitBranch = gitBranch;
         this.gitDirectory = gitDirectory;
@@ -44,6 +46,9 @@ public class Project {
     public void setJiraID(String jiraID) {
         this.jiraID = jiraID;
     }
+
+    public ApproachProportion getApproachProportion() { return approachProportion; }
+    public void setApproachProportion(ApproachProportion approachProportion) { this.approachProportion = approachProportion; }
 
     public String getGitURL() {
         return gitURL;

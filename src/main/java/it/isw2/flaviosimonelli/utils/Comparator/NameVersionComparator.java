@@ -1,4 +1,4 @@
-package it.isw2.flaviosimonelli.utils;
+package it.isw2.flaviosimonelli.utils.Comparator;
 
 import it.isw2.flaviosimonelli.model.Version;
 

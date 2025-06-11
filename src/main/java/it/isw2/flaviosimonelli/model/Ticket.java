@@ -1,8 +1,6 @@
 package it.isw2.flaviosimonelli.model;
 
-import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -12,7 +10,7 @@ public class Ticket {
     private String id;
     private String commitHash; // commit fix for the issue
     private Version fixVersion;             // Version in which the issue is fixed
-    private Version affectedVersion;        // First version in which the issue is present
+    private Version injectedVersion;        // First version in which the issue is present
     private ZonedDateTime openDate;     // When the ticket was resolved
     private Version openVersion; // Version in which the ticket was opened
     private List<String> nameMethodsBuggy; // List of methods that are buggy
@@ -25,12 +23,12 @@ public class Ticket {
         this.fixVersion = fixVersion;
     }
 
-    public Version getAffectedVersion() {
-        return affectedVersion;
+    public Version getInjectedVersion() {
+        return injectedVersion;
     }
 
-    public void setAffectedVersion(Version affectedVersion) {
-        this.affectedVersion = affectedVersion;
+    public void setInjectedVersion(Version injectedVersion) {
+        this.injectedVersion = injectedVersion;
     }
 
     public ZonedDateTime getOpenDate() {

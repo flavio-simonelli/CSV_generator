@@ -47,7 +47,7 @@ public class CsvExporter {
                         .append(escapeCsv(ticket.getCommitHash() != null ? ticket.getCommitHash() : "")).append(",")
                         .append(escapeCsv(ticket.getOpenVersion() != null ? ticket.getOpenVersion().getName() : "")).append(",")
                         .append(escapeCsv(ticket.getFixVersion() != null ? ticket.getFixVersion().getName() : "")).append(",")
-                        .append(escapeCsv(ticket.getAffectedVersion() != null ? ticket.getAffectedVersion().getName() : "")).append(",")
+                        .append(escapeCsv(ticket.getInjectedVersion() != null ? ticket.getInjectedVersion().getName() : "")).append(",")
                         .append(escapeCsv(ticket.getNameMethodsBuggy() != null ? String.join(";", ticket.getNameMethodsBuggy()) : ""))
                         .append("\n");
             }
