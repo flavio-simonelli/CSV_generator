@@ -6,6 +6,7 @@ import it.isw2.flaviosimonelli.model.Ticket;
 import it.isw2.flaviosimonelli.model.Version;
 import it.isw2.flaviosimonelli.model.method.Method;
 import it.isw2.flaviosimonelli.utils.CsvExporter;
+import it.isw2.flaviosimonelli.utils.NameVersionComparator;
 import it.isw2.flaviosimonelli.utils.VersionComparator;
 import it.isw2.flaviosimonelli.utils.bean.GitBean;
 import it.isw2.flaviosimonelli.utils.bean.JiraBean;
@@ -13,7 +14,7 @@ import it.isw2.flaviosimonelli.utils.dao.impl.GitService;
 import it.isw2.flaviosimonelli.utils.dao.impl.JiraService;
 import it.isw2.flaviosimonelli.utils.exception.SystemException;
 
-import java.time.LocalDateTime;
+
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Date;
@@ -112,6 +113,15 @@ public class CreateCSVController {
         LOGGER.info("Labeling completato per tutti i metodi buggy");
     }
 
+    private int getVersionIndex(List<Version> versions, Version target) {
+        for (int i = 0; i < versions.size(); i++) {
+            if (versions.get(i).getName().equals(target.getName())) {
+                return i;
+            }
+        }
+        return -1; // Non trovata
+    }
+
     /**
      * Retrieves and filters versions from Jira that also exist as Git tags.
      *
@@ -122,6 +132,9 @@ public class CreateCSVController {
         JiraService jiraService = new JiraService();
         List<Version> versions = jiraService.getVersions(project);
         List<Version> validVersions = filterValidVersions(project, versions);
+        // ordina le versioni in ordine cronologico
+        validVersions.sort(new VersionComparator());
+
         project.setVersions(validVersions);
     }
 
@@ -201,7 +214,7 @@ public class CreateCSVController {
 
     private void filterTickets(Project project) throws Exception {
         GitService gitService = new GitService();
-        VersionComparator comparator = new VersionComparator();
+        NameVersionComparator comparator = new NameVersionComparator();
 
         Iterator<Ticket> it = project.getTickets().iterator();
         while (it.hasNext()) {
@@ -229,98 +242,83 @@ public class CreateCSVController {
             }
         }
     }
+
     /**
      * Calcola il valore di proporzione P per il progetto e predice la Injected Version
      * per i ticket che non ne hanno una.
      * Formula: P = (FV - IV) / (FV - OV)
      * Predizione IV = FV - (FV - OV) * P
+     * Applica l'approccio complete poichè a noi non interessa un modello che sia realistico (per il nostro scopo), ma piuttosto un modello che sia più accurato possibile.
      *
      * @param project Il progetto per cui calcolare la proporzione
      */
     private void proportion(Project project) {
         List<Ticket> tickets = project.getTickets();
-        VersionComparator comparator = new VersionComparator();
+        List<Version> versions = project.getVersions();
+        int p = completeApprochPropotion(tickets, versions);
+        LOGGER.info("Proporzione P calcolata: " + p);
+        for (Ticket ticket : tickets) {
+            Version fixVersion = ticket.getFixVersion();
+            Version openVersion = ticket.getOpenVersion();
+            Version affectedVersion = ticket.getAffectedVersion();
+
+            if (affectedVersion == null && fixVersion != null && openVersion != null) {
+                // Calcola la versione iniettata usando la proporzione P
+                int fvIndex = versions.indexOf(fixVersion);
+                int ovIndex = versions.indexOf(openVersion);
+
+                if (fvIndex >= 0 && ovIndex >= 0 && fvIndex > ovIndex) {
+                    // Calcola l'indice della versione iniettata
+                    int ivIndex = (int) Math.ceil(fvIndex - (fvIndex - ovIndex) * ((double) p));
+                    if (ivIndex < 0) ivIndex = 0; // Assicurati che l'indice non sia negativo
+                    if (ivIndex >= versions.size()) ivIndex = versions.size() - 1; // Assicurati che l'indice non superi la dimensione della lista
+
+                    Version injectedVersion = versions.get(ivIndex);
+                    ticket.setAffectedVersion(injectedVersion);
+                    LOGGER.info("Ticket " + ticket.getId() + " ha una versione iniettata predetta: " + injectedVersion.getName());
+                } else {
+                    LOGGER.warning("Non è possibile calcolare la versione iniettata per il ticket " + ticket.getId());
+                }
+            }
+        }
+
+
+    }
+
+    private int completeApprochPropotion(List<Ticket> tickets, List<Version> versions) {
         List<Double> pValues = new ArrayList<>();
-
-        // Calcola i valori P per i ticket con IV (affected version) conosciuta
+        // Calcola i valori di P per ogni ticket
         for (Ticket ticket : tickets) {
-            Version iv = ticket.getAffectedVersion();  // Injected Version
-            Version fv = ticket.getFixVersion();       // Fix Version
-            Version ov = ticket.getOpenVersion();      // Opening Version
+            Version fixVersion = ticket.getFixVersion();
+            Version openVersion = ticket.getOpenVersion();
+            Version affectedVersion = ticket.getAffectedVersion();
 
-            if (iv != null && fv != null && ov != null) {
-                int fvIndex = getVersionIndex(project.getVersions(), fv);
-                int ivIndex = getVersionIndex(project.getVersions(), iv);
-                int ovIndex = getVersionIndex(project.getVersions(), ov);
-
-                if (fvIndex >= 0 && ivIndex >= 0 && ovIndex >= 0 &&
-                        fvIndex > ivIndex && fvIndex > ovIndex && ivIndex <= ovIndex) {
-                    double p = (double)(fvIndex - ivIndex) / (fvIndex - ovIndex);
-                    pValues.add(p);
-                }
+            if (fixVersion == null || openVersion == null || affectedVersion == null) {
+                continue;
             }
+
+            int fvIndex = versions.indexOf(fixVersion);
+            int ovIndex = versions.indexOf(openVersion);
+            int ivIndex = versions.indexOf(affectedVersion);
+
+            if (fvIndex == ovIndex) continue; // evita divisione per zero
+
+            double p = (double) (fvIndex - ivIndex) / (fvIndex - ovIndex);
+            pValues.add(p);
         }
 
-        // Calcola il valore P medio
-        double avgP;
-        if (!pValues.isEmpty()) {
-            double sum = 0.0;
-            for (Double p : pValues) {
-                sum += p;
-            }
-            avgP = sum / pValues.size();
+        // Calcola la mediana dei valori di P
+        if (pValues.isEmpty()) return 0;
+        pValues.sort(Double::compareTo);
+        int size = pValues.size();
+        double median;
+        if (size % 2 == 1) {
+            median = pValues.get(size / 2);
         } else {
-            // Se non ci sono ticket validi, usa 0.5 come valore predefinito
-            avgP = 0.5;
-            LOGGER.warning("Nessun ticket valido trovato per calcolare P. Utilizzo valore predefinito: " + avgP);
+            median = (pValues.get(size / 2 - 1) + pValues.get(size / 2)) / 2.0;
         }
-
-        // Predici la Injected Version per i ticket senza IV
-        for (Ticket ticket : tickets) {
-            if (ticket.getAffectedVersion() == null && ticket.getFixVersion() != null) {
-                Version fv = ticket.getFixVersion();
-                Version ov = ticket.getOpenVersion();
-
-                if (ov != null) {
-                    int fvIndex = getVersionIndex(project.getVersions(), fv);
-                    int ovIndex = getVersionIndex(project.getVersions(), ov);
-
-                    if (fvIndex >= 0 && ovIndex >= 0 && fvIndex > ovIndex) {
-                        // Calcola l'indice della Injected Version prevista
-                        int predictedIvIndex = (int) Math.round(fvIndex - (fvIndex - ovIndex) * avgP);
-
-                        // Assicurati che l'indice sia valido
-                        if (predictedIvIndex >= 0 && predictedIvIndex < project.getVersions().size()) {
-                            Version predictedIv = project.getVersions().get(predictedIvIndex);
-                            ticket.setAffectedVersion(predictedIv);
-                            LOGGER.info("Versione di introduzione predetta per ticket " + ticket.getId() + ": " + predictedIv.getName());
-                        }
-                    }
-                }
-            }
-        }
-
-        LOGGER.info("Valore P medio calcolato: " + avgP);
+        return (int) Math.ceil(median);
     }
-
-
-    /**
-     * Trova l'indice di una versione nell'elenco delle versioni del progetto.
-     *
-     * @param versions Elenco delle versioni
-     * @param version La versione di cui trovare l'indice
-     * @return L'indice della versione o -1 se non trovata
-     */
-
-    private int getVersionIndex(List<Version> versions, Version version) {
-        for (int i = 0; i < versions.size(); i++) {
-            if (versions.get(i).getName().equals(version.getName())) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
 
 
 

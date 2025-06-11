@@ -2,7 +2,7 @@ package it.isw2.flaviosimonelli.utils.dao.impl;
 
 import it.isw2.flaviosimonelli.model.Project.Project;
 import it.isw2.flaviosimonelli.model.Version;
-import it.isw2.flaviosimonelli.utils.VersionComparator;
+import it.isw2.flaviosimonelli.utils.NameVersionComparator;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -15,7 +15,6 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -177,7 +176,7 @@ public class JiraService {
         List<String> versionNames = extractVersionNames(versionsArray);
 
         List<String> sortedVersions = versionNames.stream()
-                .sorted(new VersionComparator())
+                .sorted(new NameVersionComparator())
                 .collect(Collectors.toList());
 
         if (findFirst) {
