@@ -22,6 +22,7 @@ import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathSuffixFilter;
@@ -375,9 +376,9 @@ public class GitService {
             return nextVersion;
 
         } catch (IOException e) {
-            throw new GitException("getVersionForCommit", "Errore di I/O o Git: " + e.getMessage(), e);
+            throw new GitException("getVersionForCommit", "Errore di I/O o Git: " + e.getMessage());
         } catch (IllegalArgumentException e) {
-            throw new GitException("getVersionForCommit", "Commit ID non valido: " + commitId, e);
+            throw new GitException("getVersionForCommit", "Commit ID non valido: " + commitId);
         }
     }
 
@@ -464,9 +465,9 @@ public class GitService {
                 }
             }
         } catch (IOException e) {
-            throw new GitException("getModifiedMethodSignaturesFromCommit", "Errore I/O: " + e.getMessage(), e);
+            throw new GitException("getModifiedMethodSignaturesFromCommit", "Errore I/O: " + e.getMessage());
         } catch (Exception e) {
-            throw new GitException("getModifiedMethodSignaturesFromCommit", "Errore generico: " + e.getMessage(), e);
+            throw new GitException("getModifiedMethodSignaturesFromCommit", "Errore generico: " + e.getMessage());
         }
 
         return modifiedSignatures;
