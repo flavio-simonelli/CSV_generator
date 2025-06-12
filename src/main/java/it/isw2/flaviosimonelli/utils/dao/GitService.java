@@ -27,6 +27,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathSuffixFilter;
 
 import java.io.*;
+import java.time.Instant;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -303,151 +304,185 @@ public class GitService {
         }
     }
 
+    /**
+     * Trova la versione più vicina a un commit specifico.
+     *
+     * @param project Il progetto da cui recuperare le versioni
+     * @param commitId L'hash del commit di cui si vuole trovare la versione
+     * @return La versione più vicina al commit, o null se non trovata
+     * @throws GitException in caso di errore durante l'operazione
+     */
+    /**
+     * Restituisce la versione del progetto corrispondente a un commit, oppure la successiva se non trovata direttamente.
+     *
+     * @param project  Il progetto
+     * @param commitId L'hash del commit da cercare
+     * @return La Version associata o la prima Version successiva in ordine cronologico
+     * @throws GitException In caso di errore durante l'accesso al repository
+     */
     public Version getVersionForCommit(Project project, String commitId) throws GitException {
-        try (Git git = Git.open(new File(project.getGitDirectory()))) {
-            Repository repo = git.getRepository();
-            RevWalk revWalk = new RevWalk(repo);
+        try (Git git = Git.open(new File(project.getGitDirectory()));
+             // Crea un RevWalk per camminare attraverso i commit
+             Repository repo = git.getRepository();
+             RevWalk revWalk = new RevWalk(repo)) {
 
-            ObjectId startId = repo.resolve(commitId);
-            if (startId == null) {
+            // Risolve l'hash del commit in un ObjectId
+            ObjectId targetId = repo.resolve(commitId);
+            if (targetId == null) {
+                // Se l'hash del commit non è valido, logga un avviso e restituisce null
+                LOGGER.warn("Commit non trovato: {}", commitId);
                 return null;
             }
-            RevCommit startCommit = revWalk.parseCommit(startId);
 
-            for (Version v : project.getVersions()) {
-                if (v.getHashCommit() != null && v.getHashCommit().equals(commitId)) {
-                    return v;
+            // Ottiene il commit associato all'ObjectId
+            RevCommit targetCommit = revWalk.parseCommit(targetId);
+            // Converte il tempo del commit in un oggetto Instant per confronti temporali
+            Instant commitInstant = Instant.ofEpochSecond(targetCommit.getCommitTime());
+
+            // 1. Primo controllo: match diretto per hash
+            for (Version version : project.getVersions()) {
+                if (commitId.equals(version.getHashCommit())) {
+                    return version;
                 }
             }
 
+            // 2. Fallback: trova la prima versione con commit successivo
             Version nextVersion = null;
-            Date commitDate = new Date(startCommit.getCommitTime() * 1000L);
+            Instant nextInstant = null;
 
-            for (Version v : project.getVersions()) {
-                if (v.getHashCommit() == null) continue;
+            for (Version version : project.getVersions()) {
+                String versionHash = version.getHashCommit();
+                if (versionHash == null) continue;
+
                 try {
-                    ObjectId versionId = repo.resolve(v.getHashCommit());
+                    ObjectId versionId = repo.resolve(versionHash);
                     if (versionId == null) continue;
+
                     RevCommit versionCommit = revWalk.parseCommit(versionId);
-                    Date versionDate = new Date(versionCommit.getCommitTime() * 1000L);
-                    if (versionDate.after(commitDate) &&
-                            (nextVersion == null || versionDate.before(new Date(revWalk.parseCommit(
-                                    repo.resolve(nextVersion.getHashCommit())).getCommitTime() * 1000L)))) {
-                        nextVersion = v;
+                    Instant versionInstant = Instant.ofEpochSecond(versionCommit.getCommitTime());
+
+                    if (versionInstant.isAfter(commitInstant)) {
+                        if (nextInstant == null || versionInstant.isBefore(nextInstant)) {
+                            nextVersion = version;
+                            nextInstant = versionInstant;
+                        }
                     }
-                } catch (Exception e) {
-                    LOGGER.warn("Errore analizzando versione " + v.getName(), e);
+                } catch (IOException e) {
+                    LOGGER.warn("Errore durante l'elaborazione della versione {}: {}", version.getName(), e.getMessage());
                 }
             }
-            revWalk.close();
+
             return nextVersion;
-        } catch (Exception e) {
-            throw new GitException("getVersionForCommit", e.getMessage());
+
+        } catch (IOException e) {
+            throw new GitException("getVersionForCommit", "Errore di I/O o Git: " + e.getMessage(), e);
+        } catch (IllegalArgumentException e) {
+            throw new GitException("getVersionForCommit", "Commit ID non valido: " + commitId, e);
         }
     }
 
-    public List<String> getModifiedMethodSignaturesfromCommit(Project project, String commitId) throws GitException {
-        List<String> modifiedMethods = new ArrayList<>();
-        try (Git git = Git.open(new File(project.getGitDirectory()))) {
-            Repository repo = git.getRepository();
-            RevWalk revWalk = new RevWalk(repo);
+    /**
+     * Recupera le firme dei metodi modificati in un commit specifico.
+     *
+     * @param project Il progetto da cui recuperare i metodi
+     * @param commitId L'hash del commit da analizzare
+     * @return Una lista di firme dei metodi modificati
+     * @throws GitException in caso di errore durante l'operazione
+     */
+    public List<String> getModifiedMethodSignaturesFromCommit(Project project, String commitId) throws GitException {
+        List<String> modifiedSignatures = new ArrayList<>();
+
+        try (Git git = Git.open(new File(project.getGitDirectory()));
+             Repository repo = git.getRepository();
+             RevWalk revWalk = new RevWalk(repo)) {
 
             ObjectId commitObjectId = repo.resolve(commitId);
+            if (commitObjectId == null) {
+                LOGGER.warn("Commit non trovato: {}", commitId);
+                return modifiedSignatures;
+            }
+
             RevCommit commit = revWalk.parseCommit(commitObjectId);
 
             if (commit.getParentCount() == 0) {
+                // Primo commit → estrai tutto
+                RevTree tree = commit.getTree();
                 try (TreeWalk treeWalk = new TreeWalk(repo)) {
-                    treeWalk.addTree(commit.getTree());
+                    treeWalk.addTree(tree);
                     treeWalk.setRecursive(true);
                     treeWalk.setFilter(PathSuffixFilter.create(".java"));
+
                     while (treeWalk.next()) {
                         String path = treeWalk.getPathString();
-                        if (path.contains("/src/test/") || path.contains("\\src\\test\\")) continue;
-                        ObjectId objectId = treeWalk.getObjectId(0);
-                        ObjectLoader loader = repo.open(objectId);
-                        byte[] fileBytes = loader.getBytes();
-                        ByteArrayInputStream inputStream = new ByteArrayInputStream(fileBytes);
-                        CompilationUnit cu;
+                        if (isTestFile(path)) continue;
+
+                        List<Method> methods = extractMethodsFromFile(repo, treeWalk.getObjectId(0), path, null);
+                        methods.stream()
+                                .map(Method::getSignature)
+                                .forEach(modifiedSignatures::add);
+                    }
+                }
+                return modifiedSignatures;
+            }
+
+            RevCommit parent = revWalk.parseCommit(commit.getParent(0).getId());
+
+            try (ObjectReader reader = repo.newObjectReader()) {
+                CanonicalTreeParser newTree = new CanonicalTreeParser(null, reader, commit.getTree());
+                CanonicalTreeParser oldTree = new CanonicalTreeParser(null, reader, parent.getTree());
+
+                try (DiffFormatter diffFormatter = new DiffFormatter(new ByteArrayOutputStream())) {
+                    diffFormatter.setRepository(repo);
+                    List<DiffEntry> diffs = diffFormatter.scan(oldTree, newTree);
+
+                    for (DiffEntry diff : diffs) {
+                        if (!diff.getNewPath().endsWith(".java") || isTestFile(diff.getNewPath())) continue;
+
+                        String newSource = getFileContent(repo, commit, diff.getNewPath());
+                        if (newSource == null) continue;
+
+                        CompilationUnit newCU;
                         try {
-                            cu = StaticJavaParser.parse(inputStream);
+                            newCU = StaticJavaParser.parse(newSource);
                         } catch (Exception e) {
+                            LOGGER.warn("Errore nel parsing di {}: {}", diff.getNewPath(), e.getMessage());
                             continue;
                         }
-                        for (ClassOrInterfaceDeclaration classDecl : cu.findAll(ClassOrInterfaceDeclaration.class)) {
-                            for (MethodDeclaration methodDecl : classDecl.getMethods()) {
-                                String signature = methodDecl.getDeclarationAsString(false, false, false);
-                                modifiedMethods.add(signature);
+
+                        List<Integer> changedLines = getChangedLines(diffFormatter, diff);
+                        for (MethodDeclaration method : newCU.findAll(MethodDeclaration.class)) {
+                            int begin = method.getBegin().map(Position::line).orElse(-1);
+                            int end = method.getEnd().map(Position::line).orElse(-1);
+                            for (int line : changedLines) {
+                                if (line >= begin && line <= end) {
+                                    modifiedSignatures.add(method.getDeclarationAsString(false, false, true));
+                                    break;
+                                }
                             }
                         }
                     }
                 }
-                return modifiedMethods;
             }
-
-            RevCommit parent = revWalk.parseCommit(commit.getParent(0).getId());
-            CanonicalTreeParser newTreeIter = new CanonicalTreeParser();
-            CanonicalTreeParser oldTreeIter = new CanonicalTreeParser();
-            try (var reader = repo.newObjectReader()) {
-                newTreeIter.reset(reader, commit.getTree());
-                oldTreeIter.reset(reader, parent.getTree());
-            }
-            try (DiffFormatter diffFormatter = new DiffFormatter(new ByteArrayOutputStream())) {
-                diffFormatter.setRepository(repo);
-                List<DiffEntry> diffs = diffFormatter.scan(oldTreeIter, newTreeIter);
-                for (DiffEntry diff : diffs) {
-                    if (!diff.getNewPath().endsWith(".java")) continue;
-                    String oldSource = getFileContent(repo, parent, diff.getOldPath());
-                    String newSource = getFileContent(repo, commit, diff.getNewPath());
-                    if (oldSource == null || newSource == null) continue;
-                    CompilationUnit oldCU = StaticJavaParser.parse(oldSource);
-                    CompilationUnit newCU = StaticJavaParser.parse(newSource);
-                    List<String> changedMethods = findChangedMethods(diffFormatter, diff, oldCU, newCU);
-                    modifiedMethods.addAll(changedMethods);
-                }
-            }
+        } catch (IOException e) {
+            throw new GitException("getModifiedMethodSignaturesFromCommit", "Errore I/O: " + e.getMessage(), e);
         } catch (Exception e) {
-            throw new GitException("getModifiedMethodSignaturesfromCommit", e.getMessage());
+            throw new GitException("getModifiedMethodSignaturesFromCommit", "Errore generico: " + e.getMessage(), e);
         }
-        return modifiedMethods;
+
+        return modifiedSignatures;
     }
 
-    private String getFileContent(Repository repo, RevCommit commit, String path) {
-        try {
-            var treeWalk = TreeWalk.forPath(repo, path, commit.getTree());
-            if (treeWalk == null) return null;
-            ObjectId objectId = treeWalk.getObjectId(0);
-            try (var objectReader = repo.newObjectReader()) {
-                byte[] data = objectReader.open(objectId).getBytes();
-                return new String(data);
-            }
-        } catch (Exception e) {
-            LOGGER.warn("Errore nel recupero del contenuto file", e);
-            return null;
-        }
-    }
 
-    private List<String> findChangedMethods(DiffFormatter diffFormatter, DiffEntry diff, CompilationUnit oldCU, CompilationUnit newCU) throws Exception {
-        List<String> modifiedMethods = new ArrayList<>();
-        var edits = diffFormatter.toFileHeader(diff).toEditList();
+    private List<Integer> getChangedLines(DiffFormatter diffFormatter, DiffEntry diff) throws IOException {
         List<Integer> changedLines = new ArrayList<>();
-        for (var edit : edits) {
+        for (var edit : diffFormatter.toFileHeader(diff).toEditList()) {
             for (int i = edit.getBeginB(); i < edit.getEndB(); i++) {
-                changedLines.add(i + 1);
+                changedLines.add(i + 1); // linee in formato 1-based
             }
         }
-        for (MethodDeclaration method : newCU.findAll(MethodDeclaration.class)) {
-            int beginLine = method.getBegin().map(p -> p.line).orElse(-1);
-            int endLine = method.getEnd().map(p -> p.line).orElse(-1);
-            for (int line : changedLines) {
-                if (line >= beginLine && line <= endLine) {
-                    String signature = method.getDeclarationAsString(false, false, true);
-                    modifiedMethods.add(signature);
-                    break;
-                }
-            }
-        }
-        return modifiedMethods;
+        return changedLines;
     }
+
 
     private int calculateMethodLoc(MethodDeclaration methodDecl) {
         Optional<BlockStmt> bodyOpt = methodDecl.getBody();
