@@ -1,7 +1,6 @@
 package it.isw2.flaviosimonelli.utils.bean;
 
 import it.isw2.flaviosimonelli.model.Project.ApproachProportion;
-import it.isw2.flaviosimonelli.view.ViewCLI;
 
 /**
  * Bean class representing Jira project configuration.
@@ -16,13 +15,10 @@ public class JiraBean {
      * Creates a configuration for a Jira project.
      *
      * @param jiraId             The identifier of the Jira project
-     * @param approachProportion
+     * @param approachProportion the approach use for predict iv of the tickets
      * @throws IllegalArgumentException if jiraId is null or empty
      */
     public JiraBean(String jiraId, String approachProportion) {
-        if (jiraId == null || jiraId.trim().isEmpty()) {
-            throw new IllegalArgumentException("Jira project ID cannot be null or empty");
-        }
         this.jiraId = jiraId;
         this.approachProportion = approachProportion;
     }

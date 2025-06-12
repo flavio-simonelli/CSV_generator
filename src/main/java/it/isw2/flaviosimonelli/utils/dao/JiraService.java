@@ -1,4 +1,4 @@
-package it.isw2.flaviosimonelli.utils.dao.impl;
+package it.isw2.flaviosimonelli.utils.dao;
 
 import it.isw2.flaviosimonelli.model.Project.Project;
 import it.isw2.flaviosimonelli.model.Version;

@@ -2,10 +2,10 @@ package it.isw2.flaviosimonelli.model.Project;
 
 import it.isw2.flaviosimonelli.model.Ticket;
 import it.isw2.flaviosimonelli.model.Version;
-import it.isw2.flaviosimonelli.utils.Comparator.NameVersionComparator;
 import it.isw2.flaviosimonelli.utils.Comparator.VersionComparator;
-import it.isw2.flaviosimonelli.utils.dao.impl.GitService;
-import it.isw2.flaviosimonelli.utils.dao.impl.JiraService;
+import it.isw2.flaviosimonelli.utils.dao.GitService;
+import it.isw2.flaviosimonelli.utils.dao.JiraService;
+import it.isw2.flaviosimonelli.utils.exception.InvalidProjectParameterException;
 import it.isw2.flaviosimonelli.utils.exception.SystemException;
 
 import java.time.ZonedDateTime;
@@ -35,25 +35,37 @@ public class ProjectFactory {
         return instance;
     }
 
-    // Method to create a new project with the given parameters
-    public Project CreateProject(Boolean localRepository, String jiraID, ApproachProportion approachProportion, String gitURL, String gitBranch, String gitDirectory, String releaseTagFormat) {
+    // Method to create a new istance of Project and clone the git repository
+    public void createProject(String jiraID, ApproachProportion approachProportion, String gitURL, String gitBranch, String parentDirectory, String releaseTagFormat) throws InvalidProjectParameterException {
         GitService gitService = new GitService();
-        // Crea entità Project e clona o apre il repository Git in base al parametro localRepository
-        if (localRepository == false) {
-            project = new Project(extractGitHubProjectName(gitURL), jiraID, approachProportion, gitURL, gitBranch, gitDirectory + "/" + extractGitHubProjectName(gitURL), releaseTagFormat);
-            // Clone del repository Git
-            gitService.cloneRepository(project);
-        } else {
-            project = new Project(extractDirectoryName(gitDirectory), jiraID, approachProportion, gitURL, gitBranch, gitDirectory, releaseTagFormat);
-            // Open the local Git repository
-            gitService.openRepository(project); // prova a vedere se il repository esiste veramente
-        }
+        // Crea il path in cui clonare il repository Git
+        String gitDirectory = parentDirectory + "/" + extractGitHubProjectName(gitURL);
+        // Clone del repository Git
+        gitService.cloneRepository(gitURL, gitDirectory, gitBranch); // prova a vedere se il repository esiste veramente
+        // Crea entità Project
+        Project project = new Project(extractGitHubProjectName(gitURL), jiraID, approachProportion, gitBranch, gitDirectory, releaseTagFormat);
         // Inizializza le versioni del progetto prendendoli da Jira
         getVersion(project);
         // Inizializza i ticket del progetto prendendoli da Jira
         getTicket(project);
 
-        return project;
+        // imposta il progetto corrente
+        this.project = project;
+    }
+
+    // Metodo che crea un nuovo progetto a partire da un repository Git locale
+    public void createProject(String JiraID, ApproachProportion approachProportion, String gitBranch, String gitDirectory, String releaseTagFormat) {
+        GitService gitService = new GitService();
+        // Open the local Git repository
+        gitService.openRepository(project); // prova a vedere se il repository esiste veramente
+        // Crea un entità project aprendo un repository Git locale
+        Project project = new Project(extractDirectoryName(gitDirectory), JiraID, approachProportion, gitBranch, gitDirectory, releaseTagFormat);
+        // Inizializza le versioni del progetto prendendoli da Jira
+        getVersion(project);
+        // Inizializza i ticket del progetto prendendoli da Jira
+        getTicket(project);
+        // imposta il progetto corrente
+        this.project = project;
     }
 
 

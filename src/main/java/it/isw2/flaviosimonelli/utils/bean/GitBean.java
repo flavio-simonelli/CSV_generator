@@ -1,5 +1,7 @@
 package it.isw2.flaviosimonelli.utils.bean;
 
+import it.isw2.flaviosimonelli.model.Project.RepositoryType;
+
 /**
  * Bean class representing Git repository configuration.
  * Supports both local repositories and remote repositories to be cloned.
@@ -10,14 +12,6 @@ public class GitBean {
     private final String path;
     private final String branch;
     private final String releaseTagFormat;
-
-    /**
-     * Repository type enumeration
-     */
-    public enum RepositoryType {
-        LOCAL,
-        REMOTE
-    }
 
     /**
      * Creates a configuration for a remote repository that will be cloned.
@@ -66,11 +60,5 @@ public class GitBean {
         return releaseTagFormat;
     }
 
-    public RepositoryType getType() {
-        return type;
-    }
-
-    public boolean isLocalRepository() {
-        return type == RepositoryType.LOCAL;
-    }
+    public RepositoryType getType() { return type;}
 }

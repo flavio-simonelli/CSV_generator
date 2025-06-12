@@ -2,20 +2,17 @@ package it.isw2.flaviosimonelli.controller;
 
 import it.isw2.flaviosimonelli.model.Project.Project;
 import it.isw2.flaviosimonelli.model.Project.ProjectFactory;
+import it.isw2.flaviosimonelli.model.Project.RepositoryType;
 import it.isw2.flaviosimonelli.model.Ticket;
 import it.isw2.flaviosimonelli.model.Version;
 import it.isw2.flaviosimonelli.model.method.Method;
 import it.isw2.flaviosimonelli.utils.CsvExporter;
-import it.isw2.flaviosimonelli.utils.Comparator.VersionComparator;
 import it.isw2.flaviosimonelli.utils.bean.GitBean;
 import it.isw2.flaviosimonelli.utils.bean.JiraBean;
-import it.isw2.flaviosimonelli.utils.dao.impl.GitService;
-import it.isw2.flaviosimonelli.utils.dao.impl.JiraService;
-import it.isw2.flaviosimonelli.utils.exception.SystemException;
+import it.isw2.flaviosimonelli.utils.exception.GitException;
 
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,17 +37,16 @@ public class CreateCSVController {
      * @return true if project creation and data processing succeeded
      */
     public boolean createCSV(JiraBean jiraBean, GitBean gitBean) {
-        try {
-            // Create project through factory
-            ProjectFactory projectFactory = ProjectFactory.getInstance();
-            Project project = projectFactory.CreateProject(
-                                gitBean.isLocalRepository(),
-                                jiraBean.getJiraId(),
-                                jiraBean.getApproachProportion(),
-                                gitBean.getRemoteUrl(),
-                                gitBean.getBranch(),
-                                gitBean.getPath(),
-                                gitBean.getReleaseTagFormat());
+        ProjectFactory projectFactory = ProjectFactory.getInstance();
+        // crea la nuova istanza del progetto scegliendo se clonare un repository remoto o utilizzare uno locale in base all'attributo RepositoryType di GitBean
+        if (gitBean.getType() == RepositoryType.LOCAL) {
+            LOGGER.info("Using local repository at: " + gitBean.getPath());
+            projectFactory.createProject(jiraBean.getJiraId(), jiraBean.getApproachProportion(), gitBean.getBranch(), gitBean.getPath(), gitBean.getReleaseTagFormat());
+        } else {
+            LOGGER.info("Cloning remote repository from: " + gitBean.getRemoteUrl());
+            projectFactory.createProject(jiraBean.getJiraId(), jiraBean.getApproachProportion(), gitBean.getRemoteUrl(), gitBean.getBranch(), gitBean.getPath(), gitBean.getReleaseTagFormat());
+        }
+
             // propotion
             proportion(project);
             // Labeling
@@ -60,8 +56,12 @@ public class CreateCSVController {
             exportProjectData(project);
 
             return true;
+        } catch (GitException e) {
+            LOGGER.log(Level.SEVERE, "Errore durante l'operazione Git: " + e.getOperation(), e);
+            return false;
+        }
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error during project processing", e);
+            LOGGER.log(Level.SEVERE, "Errore durante la creazione del progetto o l'elaborazione dei dati", e);
             return false;
         }
     }

@@ -9,7 +9,6 @@ public class Project {
     private String name; // name of the project, usually the name of the Git repository
     private String jiraID; // ID of the project in Jira, used to retrieve tickets
     private ApproachProportion approachProportion; // Approach for the proportion applied to the ticket in a project
-    private String gitURL; // URL of the Git repository, used to clone or open the repository
     private String gitBranch; // Branch of the Git repository to work with
     private String gitDirectory; // Directory where the Git repository is located or will be cloned
     private String releaseTagFormat; // Convention for release tags, e.g. "v{VERSION}" or "release-{VERSION}"
@@ -17,11 +16,10 @@ public class Project {
     private List<Version> versions; // List of versions associated with the project
 
     // Constructor for creating a new project with all necessary parameters (without tickets and versions)
-    public Project(String name, String jiraID, ApproachProportion approachProportion, String gitURL, String gitBranch, String gitDirectory, String releaseTagFormat) {
+    public Project(String name, String jiraID, ApproachProportion approachProportion, String gitBranch, String gitDirectory, String releaseTagFormat) {
         this.name = name;
         this.jiraID = jiraID;
         this.approachProportion = approachProportion;
-        this.gitURL = gitURL;
         this.gitBranch = gitBranch;
         this.gitDirectory = gitDirectory;
         this.releaseTagFormat = releaseTagFormat;
@@ -49,13 +47,6 @@ public class Project {
 
     public ApproachProportion getApproachProportion() { return approachProportion; }
     public void setApproachProportion(ApproachProportion approachProportion) { this.approachProportion = approachProportion; }
-
-    public String getGitURL() {
-        return gitURL;
-    }
-    public void setGitURL(String gitURL) {
-        this.gitURL = gitURL;
-    }
 
     public String getGitBranch() {
         return gitBranch;

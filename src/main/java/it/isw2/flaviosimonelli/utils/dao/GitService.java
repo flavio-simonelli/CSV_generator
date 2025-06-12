@@ -1,7 +1,6 @@
-package it.isw2.flaviosimonelli.utils.dao.impl;
+package it.isw2.flaviosimonelli.utils.dao;
 
 import ch.qos.logback.classic.Logger;
-import com.github.javaparser.JavaParser;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -14,6 +13,8 @@ import it.isw2.flaviosimonelli.model.Version;
 import it.isw2.flaviosimonelli.model.method.Method;
 import it.isw2.flaviosimonelli.model.method.Metric;
 import it.isw2.flaviosimonelli.utils.VersionTagger;
+import it.isw2.flaviosimonelli.utils.exception.InvalidProjectParameterException;
+import it.isw2.flaviosimonelli.utils.exception.GitException;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
@@ -27,7 +28,6 @@ import java.io.File;
 
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathSuffixFilter;
@@ -43,19 +43,20 @@ public class GitService {
 
     /**
      * Clone repository
-     * @param project instance of the project to clone
+     * @param gitURL URL of the Git repository to clone
+     * @param gitBranch Branch to clone
+     * @param gitDirectory Directory where the repository will be cloned
      */
-    public void cloneRepository(Project project) {
+    public void cloneRepository(String gitURL, String gitBranch, String gitDirectory) throws InvalidProjectParameterException {
         try {
             // Clone the repository
             Git.cloneRepository()
-                .setURI(project.getGitURL())
-                .setBranch(project.getGitBranch())
-                .setDirectory(new File(project.getGitDirectory()))
+                .setURI(gitURL)
+                .setBranch(gitBranch)
+                .setDirectory(new File(gitDirectory))
                 .call();
-            System.out.println("Repository cloned to: " + project.getGitDirectory());
         } catch (GitAPIException e) {
-            System.err.println("Error cloning repository: " + e.getMessage());
+            throw new GitException("clone", e.getMessage());
         }
     }
 
@@ -67,9 +68,8 @@ public class GitService {
         try {
             // Apre il repository esistente
             Git.open(new File(project.getGitDirectory()));
-            System.out.println("Repository aperto da: " + project.getGitDirectory());
-        } catch (Exception e) {
-            System.err.println("Errore nell'apertura del repository: " + e.getMessage());
+        } catch (IOException e) {
+            throw new GitException("open", "Errore nell'aprire il repository: " + e.getMessage());
         }
     }
 

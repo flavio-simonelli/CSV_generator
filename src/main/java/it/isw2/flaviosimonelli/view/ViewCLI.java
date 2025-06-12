@@ -213,24 +213,18 @@ public class ViewCLI {
 
         public static ApproachProportion fromString(String value) {
             if (value == null) return COMPLETE;
-            switch (value.toUpperCase()) {
-                case "CENTRAL_SLIDING_WINDOW":
-                    return CENTRAL_SLIDING_WINDOW;
-                case "COMPLETE":
-                default:
-                    return COMPLETE;
-            }
+            return switch (value.toUpperCase()) {
+                case "CENTRAL_SLIDING_WINDOW" -> CENTRAL_SLIDING_WINDOW;
+                default -> COMPLETE;
+            };
         }
 
         public static String toString(ApproachProportion value) {
             if (value == null) return "COMPLETE";
-            switch (value) {
-                case CENTRAL_SLIDING_WINDOW:
-                    return "CENTRAL_SLIDING_WINDOW";
-                case COMPLETE:
-                default:
-                    return "COMPLETE";
-            }
+            return switch (value) {
+                case CENTRAL_SLIDING_WINDOW -> "CENTRAL_SLIDING_WINDOW";
+                default -> "COMPLETE";
+            };
         }
     }
 }
