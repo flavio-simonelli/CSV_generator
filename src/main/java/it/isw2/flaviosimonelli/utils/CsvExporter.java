@@ -67,7 +67,7 @@ public class CsvExporter {
 
         try (FileWriter writer = new FileWriter(filePath)) {
             // Intestazione con le colonne delle metriche
-            writer.append("Version,ClassName,MethodName,FilePath,LOC,StatementsCount,CyclomaticComplexity,buggy\n");
+            writer.append("Version,ClassPath,MethodName,LOC,StatementsCount,CyclomaticComplexity,buggy\n");
 
             List<Version> versions = project.getVersions();
             for (Version version : versions) {
@@ -77,9 +77,8 @@ public class CsvExporter {
                 if (methods != null) {
                     for (Method method : methods) {
                         writer.append(escapeCsv(version.getName())).append(",")
-                                .append(escapeCsv(method.getClassName())).append(",")
-                                .append(escapeCsv(method.getSignature())).append(",")
-                                .append(escapeCsv(method.getPath())).append(",");
+                                .append(escapeCsv(method.getClassPath())).append(",")
+                                .append(escapeCsv(method.getSignature())).append(",");
 
                         // Aggiungi le metriche, lasciando il campo vuoto se la metrica è zero
                         writer.append(method.getMetric().getLoc() > 0 ? String.valueOf(method.getMetric().getLoc()) : "").append(",")

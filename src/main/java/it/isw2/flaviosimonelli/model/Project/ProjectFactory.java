@@ -5,8 +5,8 @@ import it.isw2.flaviosimonelli.model.Version;
 import it.isw2.flaviosimonelli.utils.Comparator.VersionComparator;
 import it.isw2.flaviosimonelli.utils.dao.GitService;
 import it.isw2.flaviosimonelli.utils.dao.JiraService;
-import it.isw2.flaviosimonelli.utils.exception.InvalidProjectParameterException;
-import it.isw2.flaviosimonelli.utils.exception.SystemException;
+import it.isw2.flaviosimonelli.utils.exception.GitException;
+import it.isw2.flaviosimonelli.utils.exception.JiraException;
 
 import java.time.ZonedDateTime;
 import java.util.Iterator;
@@ -36,7 +36,7 @@ public class ProjectFactory {
     }
 
     // Method to create a new istance of Project and clone the git repository
-    public void createProject(String jiraID, ApproachProportion approachProportion, String gitURL, String gitBranch, String parentDirectory, String releaseTagFormat) throws InvalidProjectParameterException {
+    public void createProject(String jiraID, ApproachProportion approachProportion, String gitURL, String gitBranch, String parentDirectory, String releaseTagFormat) throws GitException, JiraException {
         GitService gitService = new GitService();
         // Crea il path in cui clonare il repository Git
         String gitDirectory = parentDirectory + "/" + extractGitHubProjectName(gitURL);
@@ -54,10 +54,10 @@ public class ProjectFactory {
     }
 
     // Metodo che crea un nuovo progetto a partire da un repository Git locale
-    public void createProject(String JiraID, ApproachProportion approachProportion, String gitBranch, String gitDirectory, String releaseTagFormat) {
+    public void createProject(String JiraID, ApproachProportion approachProportion, String gitBranch, String gitDirectory, String releaseTagFormat) throws GitException, JiraException {
         GitService gitService = new GitService();
         // Open the local Git repository
-        gitService.openRepository(project); // prova a vedere se il repository esiste veramente
+        gitService.openRepository(gitDirectory, gitBranch); // prova a vedere se il repository esiste veramente
         // Crea un entità project aprendo un repository Git locale
         Project project = new Project(extractDirectoryName(gitDirectory), JiraID, approachProportion, gitBranch, gitDirectory, releaseTagFormat);
         // Inizializza le versioni del progetto prendendoli da Jira
@@ -87,24 +87,17 @@ public class ProjectFactory {
      * @param project The project to process
      *
      */
-    private void getVersion(Project project) {
+    private void getVersion(Project project) throws JiraException, GitException {
         JiraService jiraService = new JiraService();
-        List<Version> versions = null;
-        try {
-            versions = jiraService.getVersions(project);
-        } catch (SystemException e) {
-            throw new RuntimeException(e);
-        }
+        // Recupera le versioni del progetto da Jira
+        List<Version> versions = jiraService.getVersions(project);
+        // Filtra le versioni per mantenere solo quelle che hanno un commit hash associato
         versions = filterVersion(project, versions);
         // ordina le versioni in ordine cronologico
         versions.sort(new VersionComparator());
         // per ogni versione, prendi tutti i metodi presenti in quella versione
-        try {
-            getMethodsforVersion(project, versions);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
+        getMethodsforVersion(project, versions);
+        // setta le versioni nel progetto
         project.setVersions(versions);
     }
 
@@ -115,17 +108,22 @@ public class ProjectFactory {
      * @param versions List of versions to filter
      * @return List of valid versions with commit hashes
      */
-    private List<Version> filterVersion(Project project, List<Version> versions) {
+    private List<Version> filterVersion(Project project, List<Version> versions) throws GitException {
         GitService gitService = new GitService();
+        // La lista che conterrà le versioni valide
         List<Version> validVersions = new ArrayList<>();
 
         for (Version version : versions) {
+            // recupera l'hash del commit associato alla versione
             String hashCommit = gitService.getCommitByVersion(project, version);
 
             if (hashCommit == null) {
+                // Se l'hash del commit è null, significa che non esiste un tag Git per questa versione la versione non verra' considerata valida
                 LOGGER.warning("Version '" + version.getName() + "' not found in Git repository for project '" + project.getName() + "'. Removing from list.");
             } else {
+                // Se l'hash del commit è valido, aggiungi la versione alla lista delle versioni valide
                 version.setHashCommit(hashCommit);
+                // Imposta la data di rilascio della versione utilizzando la data del commit
                 Date commitDate = gitService.getCommitDate(project, hashCommit);
                 if (commitDate != null) {
                     version.setReleaseDate(commitDate);
@@ -143,7 +141,7 @@ public class ProjectFactory {
      * @param project The project to process
      * @throws Exception If an error occurs during method extraction
      */
-    private void getMethodsforVersion(Project project, List<Version> versions) throws Exception {
+    private void getMethodsforVersion(Project project, List<Version> versions) throws GitException {
         GitService gitService = new GitService();
         for (Version version : versions) {
             version.setMethods(gitService.getMethodsInVersion(project, version));
@@ -156,20 +154,15 @@ public class ProjectFactory {
      * @param project The project to process
      *
      */
-    private void getTicket(Project project) {
+    private void getTicket(Project project) throws JiraException {
         JiraService jiraService = new JiraService();
+        // lista che conterrà i ticket bug risolti
         List<Ticket> tickets = null;
-        try {
-            tickets = jiraService.getFixedBugTickets(project);
-        } catch (SystemException e) {
-            throw new RuntimeException(e);
-        }
+        // preleva da jira i ticket bug risolti per il progetto
+        tickets = jiraService.getFixedBugTickets(project);
         // set the fix version for each ticket
-        try {
-            setFixVersionForTickets(project, tickets);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        setFixVersionForTickets(project, tickets);
+
         // set opening version for each ticket
         setOpeningVersionForTickets(project, tickets);
         // filter the tickets to remove those are invalid
@@ -184,18 +177,14 @@ public class ProjectFactory {
      * @param project The project
      * @param tickets The list of tickets to process
      */
-    private void setFixVersionForTickets(Project project, List<Ticket> tickets) throws Exception {
+    private void setFixVersionForTickets(Project project, List<Ticket> tickets) throws GitException {
         GitService gitService = new GitService();
         for (Ticket ticket : tickets) {
             String fixCommitHash = gitService.findFixCommitForTicket(project, ticket.getId());
             if (fixCommitHash != null) {
                 ticket.setCommitHash(fixCommitHash);
                 ticket.setFixVersion(gitService.getVersionForCommit(project, fixCommitHash));
-                try {
-                    ticket.setNameMethodsBuggy(gitService.getModifiedMethodSignaturesfromCommit(project, fixCommitHash));
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
+                ticket.setNameMethodsBuggy(gitService.getModifiedMethodSignaturesfromCommit(project, fixCommitHash));
             } else {
                 ticket.setFixVersion(null);
                 ticket.setCommitHash(null);

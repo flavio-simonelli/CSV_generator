@@ -1,6 +1,7 @@
 package it.isw2.flaviosimonelli.utils.dao;
 
 import ch.qos.logback.classic.Logger;
+import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -8,311 +9,345 @@ import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.stmt.*;
 import it.isw2.flaviosimonelli.model.Project.Project;
-
 import it.isw2.flaviosimonelli.model.Version;
 import it.isw2.flaviosimonelli.model.method.Method;
 import it.isw2.flaviosimonelli.model.method.Metric;
 import it.isw2.flaviosimonelli.utils.VersionTagger;
-import it.isw2.flaviosimonelli.utils.exception.InvalidProjectParameterException;
 import it.isw2.flaviosimonelli.utils.exception.GitException;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.*;
-
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathSuffixFilter;
 
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
+import java.util.regex.Pattern;
 
-
+/**
+ * Servizio per operazioni su repository Git.
+ * Tutti i metodi pubblici lanciano solo GitException.
+ */
 public class GitService {
-
 
     private static final Logger LOGGER = (Logger) org.slf4j.LoggerFactory.getLogger(GitService.class);
 
     /**
-     * Clone repository
-     * @param gitURL URL of the Git repository to clone
-     * @param gitBranch Branch to clone
-     * @param gitDirectory Directory where the repository will be cloned
+     * Clona un repository Git in una directory specificata.
+     *
+     * @param gitURL      URL del repository Git da clonare
+     * @param gitBranch   Branch da clonare
+     * @param gitDirectory Directory di destinazione per il clone
+     * @throws GitException in caso di errore durante il clone
      */
-    public void cloneRepository(String gitURL, String gitBranch, String gitDirectory) throws InvalidProjectParameterException {
+    public void cloneRepository(String gitURL, String gitBranch, String gitDirectory) throws GitException {
         try {
-            // Clone the repository
             Git.cloneRepository()
-                .setURI(gitURL)
-                .setBranch(gitBranch)
-                .setDirectory(new File(gitDirectory))
-                .call();
+                    .setURI(gitURL)
+                    .setBranch(gitBranch)
+                    .setDirectory(new File(gitDirectory))
+                    .call();
         } catch (GitAPIException e) {
             throw new GitException("clone", e.getMessage());
         }
     }
 
     /**
-     * Check open an existing repository
-     * @param project istance of the project to open
+     * Apre un repository Git esistente e cambia al branch specificato.
+     *
+     * @param gitDirectory Directory del repository Git
+     * @param gitBranch    Branch da cui lavorare
+     * @throws GitException in caso di errore durante l'apertura del repository o il checkout del branch
      */
-    public void openRepository(Project project) {
+    public void openRepository(String gitDirectory, String gitBranch) throws GitException {
         try {
-            // Apre il repository esistente
-            Git.open(new File(project.getGitDirectory()));
-        } catch (IOException e) {
+            Git git = Git.open(new File(gitDirectory));
+            git.checkout().setName(gitBranch).call();
+            git.close();
+        } catch (IOException | GitAPIException e) {
             throw new GitException("open", "Errore nell'aprire il repository: " + e.getMessage());
         }
     }
 
     /**
-     * Ottiene il commit corrispettivo a una versione specifica
-     * @param version nome della versione di cui ottenere il commit
-     * @return l'ID del commit corrispondente alla versione specificata
+     * Recupera l'hash del commit associato a una versione specifica.
+     *
+     * @param project Il progetto da cui recuperare il commit
+     * @param version La versione di cui si vuole ottenere l'hash del commit
+     * @return L'hash del commit associato alla versione, o null se non trovato
+     * @throws GitException in caso di errore durante l'operazione
      */
-    public String getCommitByVersion(Project project, Version version) {
-        // Applica la versione sulla convenzione del tag
+    public String getCommitByVersion(Project project, Version version) throws GitException {
+        // Applica il formato del tag di rilascio per ottenere il nome del tag
         String versionTag = VersionTagger.applyVersion(project.getReleaseTagFormat(), version.getName());
+        // Apre il repository git
         try (Git git = Git.open(new File(project.getGitDirectory()))) {
-            // Ottiene il commit corrispondente alla versione specificata
+            // Trova il riferimento del tag nel repository
             Ref ref = git.getRepository().findRef(versionTag);
             if (ref != null) {
+                // Se il riferimento esiste, ottiene l'ObjectId del commit associato al tag
                 ObjectId objectId = ref.getObjectId();
-                return objectId.getName(); // Restituisce l'ID del commit
+                // Restituisce il nome del commit (hash)
+                return objectId.getName();
             } else {
-                System.err.println("Versione non trovata: " + versionTag);
+                // Se il riferimento non esiste, restituisce null
                 return null;
             }
         } catch (IOException e) {
-            System.err.println("Errore nell'apertura del repository: " + e.getMessage());
-            return null;
+            throw new GitException("getCommitByVersion", "Errore nell'aprire il repository: " + e.getMessage());
         }
     }
 
     /**
-     * Ottiene la lista dei metodi di un commit specifico
+     * Estrae tutti i metodi Java presenti in una specifica versione del progetto.
+     *
+     * @param project Il progetto da analizzare.
+     * @param version La versione del progetto da cui estrarre i metodi.
+     * @return Una lista di metodi presenti nella versione specificata.
+     * @throws GitException Se si verifica un errore durante l'accesso al repository Git.
      */
-    public List<Method> getMethodsInVersion(Project project, Version version) throws Exception {
+    public List<Method> getMethodsInVersion(Project project, Version version) throws GitException {
+        // Lista per memorizzare i metodi estratti
         List<Method> methods = new ArrayList<>();
 
-        try (
-             Repository repository = Git.open(new File(project.getGitDirectory())).getRepository();
-             RevWalk walk = new RevWalk(repository)) {
-                ObjectId commitId = repository.resolve(version.getHashCommit());
-                RevCommit commit = walk.parseCommit(commitId);
-                ObjectId treeId = commit.getTree().getId();
+        try (Repository repository = Git.open(new File(project.getGitDirectory())).getRepository();
+             RevWalk revWalk = new RevWalk(repository)) {
+            // va a cercare il commit associato alla versione
+            RevCommit commit = revWalk.parseCommit(repository.resolve(version.getHashCommit()));
+            // Ottiene l'ID dell'albero del commit
+            ObjectId treeId = commit.getTree().getId();
 
             try (TreeWalk treeWalk = new TreeWalk(repository)) {
+                // Configura il TreeWalk per camminare nell'albero del commit
                 treeWalk.addTree(treeId);
+                // Imposta il TreeWalk per essere ricorsivo e filtrare solo i file .java
                 treeWalk.setRecursive(true);
+                // Filtra i file per estensione .java
                 treeWalk.setFilter(PathSuffixFilter.create(".java"));
-
+                // Itera attraverso i file trovati
                 while (treeWalk.next()) {
-                    String path = treeWalk.getPathString();
-
-                    // Escludi con precisione i file nella cartella src/test/
-                    if (path.contains("/src/test/") || path.contains("\\src\\test\\")) {
-                        continue;
-                    }
-
-                    ObjectId objectId = treeWalk.getObjectId(0);
-                    ObjectLoader loader = repository.open(objectId);
-
-                    byte[] fileBytes = loader.getBytes();
-                    ByteArrayInputStream inputStream = new ByteArrayInputStream(fileBytes);
-
-                    CompilationUnit cu;
-                    try {
-                        cu = StaticJavaParser.parse(inputStream);
-                    } catch (Exception e) {
-                        continue; // ignora file non validi
-                    }
-
-                    for (ClassOrInterfaceDeclaration classDecl : cu.findAll(ClassOrInterfaceDeclaration.class)) {
-                        String className = classDecl.getNameAsString();
-
-                        for (MethodDeclaration methodDecl : classDecl.getMethods()) {
-                            String signature = methodDecl.getDeclarationAsString(false, false, false);
-                            // Estrazione del body del metodo
-                            BlockStmt methodBody = methodDecl.getBody().orElse(null);
-                            String content = methodBody != null ? methodBody.toString() : "";
-                            Method method = new Method(signature, className, path, version.getName(), content);
-
-                            // Calcola e imposta la metrica LOC
-                            int loc = calculateMethodLoc(methodDecl);
-                            Metric metric = method.getMetric();
-                            metric.setLoc(loc);
-                            metric.setStatementsCount(getStatementCount(methodDecl));
-                            metric.setCyclomaticComplexity(getCyclomaticComplexity(methodDecl));
-
-
-                            methods.add(method);
-                        }
-                    }
-
+                    // Ottiene il percorso del file corrente
+                    String filePath = treeWalk.getPathString();
+                    // Ignora i file di test
+                    if (isTestFile(filePath)) continue;
+                    // Estrae i metodi dal file corrente
+                    List<Method> extracted = extractMethodsFromFile(repository, treeWalk.getObjectId(0), filePath, version);
+                    // Aggiunge i metodi estratti alla lista principale
+                    methods.addAll(extracted);
                 }
             }
+        } catch (IOException | ParseProblemException e) {
+            throw new GitException("getMethodsInVersion", "Errore durante l'estrazione dei metodi: " + e.getMessage());
         }
 
         return methods;
     }
 
     /**
-     * Trova i commit che risolvono un ticket specifico.
-     *
-     * @param project Il progetto in cui cercare i commit
-     * @param ticketId L'ID del ticket da cercare nei commit
-     * @return L'ultimo commit che ha nel messaggio il ticketId specificato, o null se non trovato
+     * Verifica se il file è un test (basato sul path).
      */
-    public String findFixCommitForTicket(Project project, String ticketId) {
-        ticketId = ticketId.toLowerCase();
-        LOGGER.info("Finding fix commit for ticket: " + ticketId);
-        RevCommit latestMatch = null;
+    private boolean isTestFile(String path) {
+        return path.contains("/src/test/") || path.contains("\\src\\test\\");
+    }
+
+    /**
+     * Estrae i metodi Java da un file specifico nel repository.
+     */
+    private List<Method> extractMethodsFromFile(Repository repository, ObjectId objectId, String filePath, Version version) {
+        // Lista per memorizzare i metodi estratti dal file
+        List<Method> methods = new ArrayList<>();
+
+        try {
+            // Apre il file dal repository e lo legge come byte array
+            byte[] fileBytes = repository.open(objectId).getBytes();
+            // Converte il byte array in un InputStream per l'analisi
+            CompilationUnit cu = StaticJavaParser.parse(new ByteArrayInputStream(fileBytes));
+            for (ClassOrInterfaceDeclaration classDecl : cu.findAll(ClassOrInterfaceDeclaration.class)) {
+                // Per ogni dichiarazione di classe, ottiene il nome della classe
+                String className = classDecl.getNameAsString();
+                for (MethodDeclaration methodDecl : classDecl.getMethods()) {
+                    // Per ogni dichiarazione di metodo, costruisce l'oggetto Method
+                    Method method = buildMethodObject(methodDecl, className, filePath, version);
+                    methods.add(method);
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Impossibile analizzare il file {}: {}", filePath, e.getMessage());
+        }
+
+        return methods;
+    }
+
+    /**
+     * Crea l'oggetto Method a partire dalla dichiarazione del metodo.
+     */
+    private Method buildMethodObject(MethodDeclaration methodDecl, String className, String path, Version version) {
+        // Ottiene la firma del metodo come stringa, senza parametri e senza tipo di ritorno
+        String signature = methodDecl.getDeclarationAsString(false, false, false);
+        // Ottiene il corpo del metodo come stringa, se presente
+        String content = methodDecl.getBody().map(BlockStmt::toString).orElse("");
+        // Costruisce il classPath come path + "/" + className
+        String classPath = path + "/" + className;
+
+        Method method = new Method(signature, classPath, version.getName(), content);
+
+        // TODO: Modificare per mettere una funzione privata che calcola le metriche e aggiungere tutte le metriche da calcolare
+        Metric metric = method.getMetric();
+        metric.setLoc(calculateMethodLoc(methodDecl));
+        metric.setStatementsCount(getStatementCount(methodDecl));
+        metric.setCyclomaticComplexity(getCyclomaticComplexity(methodDecl));
+
+        return method;
+    }
+
+    /**
+     * Trova l'ultimo commit che ha risolto un ticket specifico.
+     *
+     * @param project Il progetto in cui cercare il commit
+     * @param ticketId L'ID del ticket da cercare
+     * @return L'hash del commit che ha risolto il ticket, o null se non trovato
+     * @throws GitException in caso di errore durante l'operazione
+     */
+    public String findFixCommitForTicket(Project project, String ticketId) throws GitException {
+        // Normalizza l'ID del ticket per evitare problemi di case sensitivity
+        final String normalizedTicketId = ticketId.toUpperCase(Locale.ROOT);
+        // Definisce i pattern per la ricerca dei commit (strong pattern per commit con parola fix)
+        final Pattern strongPattern = Pattern.compile(
+                "\\b(fix(?:es|ed)?|resolve(?:s|d)?|close(?:s|d)?)\\b.*\\b" + Pattern.quote(normalizedTicketId) + "\\b",
+                Pattern.CASE_INSENSITIVE
+        );
+        // Fallback pattern per commit che menzionano il ticket
+        final Pattern containsPattern = Pattern.compile(
+                "\\b" + Pattern.quote(normalizedTicketId) + "\\b",
+                Pattern.CASE_INSENSITIVE
+        );
 
         try (Git git = Git.open(new File(project.getGitDirectory()))) {
+            // Recupera il log dei commit del repository
             Iterable<RevCommit> commits = git.log().call();
+            RevCommit strongMatch = null;
+            RevCommit weakMatch = null;
 
             for (RevCommit commit : commits) {
+                // Ottiene il messaggio completo del commit
                 String message = commit.getFullMessage();
-                if (message != null && message.toLowerCase().contains(ticketId)) {
-                    if (latestMatch == null || commit.getCommitTime() > latestMatch.getCommitTime()) {
-                        latestMatch = commit;
+                // Se il messaggio è null, salta al prossimo commit
+                if (message == null) continue;
+
+                if (strongPattern.matcher(message).find()) {
+                    // Se il commit corrisponde al pattern forte, verifica se è il più recente fra quelli forti
+                    if (strongMatch == null || commit.getCommitTime() > strongMatch.getCommitTime()) {
+                        strongMatch = commit;
+                    }
+                } else if (containsPattern.matcher(message).find()) {
+                    // Se il commit corrisponde al pattern debole, verifica se è il più recente fra quelli deboli
+                    if (weakMatch == null || commit.getCommitTime() > weakMatch.getCommitTime()) {
+                        weakMatch = commit;
                     }
                 }
             }
 
-            if (latestMatch != null) {
-                LOGGER.info("Trovato commit: " + latestMatch.getName() + " per il ticket: " + ticketId);
-                return latestMatch.getName();
+            if (strongMatch != null) {
+                // Se è stato trovato un commit forte, restituisce il suo nome
+                LOGGER.info("Commit forte trovato: {}", strongMatch.getName());
+                return strongMatch.getName();
+            } else if (weakMatch != null) {
+                // Se non è stato trovato un commit forte, ma uno debole, restituisce il suo nome
+                LOGGER.info("Commit debole trovato: {}", weakMatch.getName());
+                return weakMatch.getName();
             } else {
-                LOGGER.info("Nessun commit trovato per il ticket: " + ticketId);
+                // Se non è stato trovato nessun commit, logga l'informazione e restituisce null
+                LOGGER.warn("Nessun commit trovato per il ticket: {}", normalizedTicketId);
                 return null;
             }
 
+        } catch (FileNotFoundException | NoHeadException e) {
+            throw new GitException("findFixCommitForTicket", "Repository Git non inizializzato correttamente: " + e.getMessage());
+        } catch (IOException e) {
+            throw new GitException("findFixCommitForTicket", "Errore I/O durante l'accesso al repository: " + e.getMessage());
+        } catch (GitAPIException e) {
+            throw new GitException("findFixCommitForTicket", "Errore Git API durante l'esecuzione del log: " + e.getMessage());
         } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+            // Catch finale per errori inaspettati, ma loggato e tracciato correttamente
+            LOGGER.error("Errore imprevisto nella ricerca commit per ticket {}: {}", normalizedTicketId, e.getMessage(), e);
+            throw new GitException("findFixCommitForTicket", "Errore imprevisto: " + e.getMessage());
         }
     }
 
     /**
-     * Ottiene la data di commit per un commit specifico.
+     * Recupera la data del commit associato a un hash specifico.
      *
-     * @param commitHash L'hash del commit di cui ottenere la data
-     * @return La data del commit, o null se non trovata
+     * @param project Il progetto da cui recuperare il commit
+     * @param commitHash L'hash del commit di cui si vuole ottenere la data
+     * @return La data del commit
+     * @throws GitException in caso di errore durante l'operazione
      */
-    public Date getCommitDate(Project project, String commitHash) {
+    public Date getCommitDate(Project project, String commitHash) throws GitException {
         try (Git git = Git.open(new File(project.getGitDirectory()))) {
+            // Crea un RevWalk per camminare attraverso i commit
             RevWalk walk = new RevWalk(git.getRepository());
+            // Risolve l'hash del commit in un ObjectId
             ObjectId commitId = git.getRepository().resolve(commitHash);
+            //ottiene il commit associato all'ObjectId
             RevCommit commit = walk.parseCommit(commitId);
+
             return new Date(commit.getCommitTime() * 1000L);
         } catch (IOException e) {
-            LOGGER.error("Failed to get commit date for " + commitHash, e);
-            return null;
+            throw new GitException("getCommitDate", e.getMessage());
         }
     }
 
-    /**
-     * Calcola la versione del progetto per un determinato commit.
-     * @param project Il progetto per cui calcolare la versione
-     * @param commitId L'ID del commit per cui calcolare la versione
-     * @return La versione del progetto associata al commit, o null se non trovata
-     */
-    public Version getVersionForCommit(Project project, String commitId) {
-        System.out.println("Cercando versione per commit: " + commitId);
+    public Version getVersionForCommit(Project project, String commitId) throws GitException {
         try (Git git = Git.open(new File(project.getGitDirectory()))) {
             Repository repo = git.getRepository();
             RevWalk revWalk = new RevWalk(repo);
 
             ObjectId startId = repo.resolve(commitId);
             if (startId == null) {
-                System.out.println("Commit di partenza non trovato: " + commitId);
                 return null;
             }
             RevCommit startCommit = revWalk.parseCommit(startId);
-            System.out.println("Commit trovato: " + startCommit.getName() + " - " + startCommit.getShortMessage());
 
-            // Prima cerca se il commit appartiene esattamente a una versione
-            System.out.println("Numero versioni disponibili: " + project.getVersions().size());
             for (Version v : project.getVersions()) {
-                System.out.println("Controllando versione: " + v.getName() + " con hash: " + v.getHashCommit());
                 if (v.getHashCommit() != null && v.getHashCommit().equals(commitId)) {
-                    System.out.println("Trovata corrispondenza esatta con versione: " + v.getName());
                     return v;
                 }
             }
 
-            // Cerca la prima versione dopo il commit
             Version nextVersion = null;
             Date commitDate = new Date(startCommit.getCommitTime() * 1000L);
-            System.out.println("Data commit: " + commitDate);
 
             for (Version v : project.getVersions()) {
-                if (v.getHashCommit() == null) {
-                    System.out.println("Versione " + v.getName() + " senza hash commit");
-                    continue;
-                }
-
+                if (v.getHashCommit() == null) continue;
                 try {
                     ObjectId versionId = repo.resolve(v.getHashCommit());
-                    if (versionId == null) {
-                        System.out.println("Hash non valido per versione " + v.getName() + ": " + v.getHashCommit());
-                        continue;
-                    }
-
+                    if (versionId == null) continue;
                     RevCommit versionCommit = revWalk.parseCommit(versionId);
                     Date versionDate = new Date(versionCommit.getCommitTime() * 1000L);
-                    System.out.println("Versione " + v.getName() + " data: " + versionDate);
-
-                    // Se la versione è successiva al commit e precede altre versioni trovate
                     if (versionDate.after(commitDate) &&
                             (nextVersion == null || versionDate.before(new Date(revWalk.parseCommit(
                                     repo.resolve(nextVersion.getHashCommit())).getCommitTime() * 1000L)))) {
                         nextVersion = v;
-                        System.out.println("Nuova versione candidata: " + v.getName());
                     }
                 } catch (Exception e) {
-                    System.out.println("Errore analizzando versione " + v.getName() + ": " + e.getMessage());
+                    LOGGER.warn("Errore analizzando versione " + v.getName(), e);
                 }
             }
-
             revWalk.close();
-
-            if (nextVersion != null) {
-                System.out.println("Versione trovata: " + nextVersion.getName());
-                return nextVersion;
-            } else {
-                System.out.println("Nessuna versione trovata dopo il commit " + commitId);
-                return null;
-            }
+            return nextVersion;
         } catch (Exception e) {
-            System.err.println("Errore in getVersionForCommit: " + e.getMessage());
-            e.printStackTrace();
-            return null;
+            throw new GitException("getVersionForCommit", e.getMessage());
         }
     }
 
-
-    /**
-     * Ottiene i metodi modificati in un commit specifico.
-     *
-     * @param project Il progetto in cui cercare i metodi modificati
-     * @param commitId L'ID del commit da analizzare
-     * @return Una lista di firme dei metodi modificati nel commit
-     * @throws Exception Se si verifica un errore durante l'analisi del commit
-     */
-    public List<String> getModifiedMethodSignaturesfromCommit(Project project, String commitId) throws Exception {
+    public List<String> getModifiedMethodSignaturesfromCommit(Project project, String commitId) throws GitException {
         List<String> modifiedMethods = new ArrayList<>();
-
         try (Git git = Git.open(new File(project.getGitDirectory()))) {
             Repository repo = git.getRepository();
             RevWalk revWalk = new RevWalk(repo);
@@ -321,36 +356,24 @@ public class GitService {
             RevCommit commit = revWalk.parseCommit(commitObjectId);
 
             if (commit.getParentCount() == 0) {
-                // Primo commit: tutti i metodi sono nuovi, estraiamoli come in getMethodsInVersion
                 try (TreeWalk treeWalk = new TreeWalk(repo)) {
                     treeWalk.addTree(commit.getTree());
                     treeWalk.setRecursive(true);
                     treeWalk.setFilter(PathSuffixFilter.create(".java"));
-
                     while (treeWalk.next()) {
                         String path = treeWalk.getPathString();
-
-                        // Se vuoi escludere test, come fai nel getMethodsInVersion
-                        if (path.contains("/src/test/") || path.contains("\\src\\test\\")) {
-                            continue;
-                        }
-
+                        if (path.contains("/src/test/") || path.contains("\\src\\test\\")) continue;
                         ObjectId objectId = treeWalk.getObjectId(0);
                         ObjectLoader loader = repo.open(objectId);
-
                         byte[] fileBytes = loader.getBytes();
                         ByteArrayInputStream inputStream = new ByteArrayInputStream(fileBytes);
-
                         CompilationUnit cu;
                         try {
                             cu = StaticJavaParser.parse(inputStream);
                         } catch (Exception e) {
-                            continue; // ignora file non validi
+                            continue;
                         }
-
                         for (ClassOrInterfaceDeclaration classDecl : cu.findAll(ClassOrInterfaceDeclaration.class)) {
-                            String className = classDecl.getNameAsString();
-
                             for (MethodDeclaration methodDecl : classDecl.getMethods()) {
                                 String signature = methodDecl.getDeclarationAsString(false, false, false);
                                 modifiedMethods.add(signature);
@@ -362,49 +385,32 @@ public class GitService {
             }
 
             RevCommit parent = revWalk.parseCommit(commit.getParent(0).getId());
-
-            // Prepara iterator per alberi
             CanonicalTreeParser newTreeIter = new CanonicalTreeParser();
             CanonicalTreeParser oldTreeIter = new CanonicalTreeParser();
-
             try (var reader = repo.newObjectReader()) {
                 newTreeIter.reset(reader, commit.getTree());
                 oldTreeIter.reset(reader, parent.getTree());
             }
-
             try (DiffFormatter diffFormatter = new DiffFormatter(new ByteArrayOutputStream())) {
                 diffFormatter.setRepository(repo);
                 List<DiffEntry> diffs = diffFormatter.scan(oldTreeIter, newTreeIter);
-
                 for (DiffEntry diff : diffs) {
-                    if (!diff.getNewPath().endsWith(".java")) {
-                        continue; // solo file Java
-                    }
-
-                    // Ottieni codice sorgente vecchio e nuovo
+                    if (!diff.getNewPath().endsWith(".java")) continue;
                     String oldSource = getFileContent(repo, parent, diff.getOldPath());
                     String newSource = getFileContent(repo, commit, diff.getNewPath());
-
-                    if (oldSource == null || newSource == null) {
-                        continue;
-                    }
-
-                    // Parse Java
+                    if (oldSource == null || newSource == null) continue;
                     CompilationUnit oldCU = StaticJavaParser.parse(oldSource);
                     CompilationUnit newCU = StaticJavaParser.parse(newSource);
-
-                    // Trova metodi modificati basandoti sul diff (linee modificate)
                     List<String> changedMethods = findChangedMethods(diffFormatter, diff, oldCU, newCU);
-
                     modifiedMethods.addAll(changedMethods);
                 }
             }
+        } catch (Exception e) {
+            throw new GitException("getModifiedMethodSignaturesfromCommit", e.getMessage());
         }
-
         return modifiedMethods;
     }
 
-    // Funzione di supporto per leggere contenuto file a partire da commit e path
     private String getFileContent(Repository repo, RevCommit commit, String path) {
         try {
             var treeWalk = TreeWalk.forPath(repo, path, commit.getTree());
@@ -415,62 +421,38 @@ public class GitService {
                 return new String(data);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.warn("Errore nel recupero del contenuto file", e);
             return null;
         }
     }
 
-    // Trova metodi modificati usando le linee modificate del diff
     private List<String> findChangedMethods(DiffFormatter diffFormatter, DiffEntry diff, CompilationUnit oldCU, CompilationUnit newCU) throws Exception {
         List<String> modifiedMethods = new ArrayList<>();
-
-        // Estrai le linee modificate dal diff
         var edits = diffFormatter.toFileHeader(diff).toEditList();
-
-        // Mappa linee modificate per file nuovo
-        // Per semplicità prendiamo le linee aggiunte/modificate sul file nuovo
         List<Integer> changedLines = new ArrayList<>();
         for (var edit : edits) {
-            // Consideriamo solo le linee nel file nuovo (da getBeginB a getEndB)
             for (int i = edit.getBeginB(); i < edit.getEndB(); i++) {
-                changedLines.add(i + 1); // le linee partono da 1
+                changedLines.add(i + 1);
             }
         }
-
-        // Per ogni metodo nel nuovo CU controlla se il range di linee include qualche linea modificata
         for (MethodDeclaration method : newCU.findAll(MethodDeclaration.class)) {
             int beginLine = method.getBegin().map(p -> p.line).orElse(-1);
             int endLine = method.getEnd().map(p -> p.line).orElse(-1);
-
             for (int line : changedLines) {
                 if (line >= beginLine && line <= endLine) {
-                    // Firma metodo come stringa: tipo di ritorno + nome + parametri
                     String signature = method.getDeclarationAsString(false, false, true);
                     modifiedMethods.add(signature);
                     break;
                 }
             }
         }
-
         return modifiedMethods;
     }
 
-
-
-
-    /**
-     * Calcola il numero effettivo di linee di codice per un metodo.
-     *
-     * @param methodDecl La dichiarazione del metodo analizzato
-     * @return Il conteggio delle linee di codice significative
-     */
     private int calculateMethodLoc(MethodDeclaration methodDecl) {
         Optional<BlockStmt> bodyOpt = methodDecl.getBody();
-
         if (bodyOpt.isPresent()) {
             String bodyString = bodyOpt.get().toString();
-
-            // Conta le righe non vuote e non di commento (semplificato)
             long loc = Arrays.stream(bodyString.split("\n"))
                     .map(String::trim)
                     .filter(line -> !line.isEmpty())
@@ -479,36 +461,27 @@ public class GitService {
                     .filter(line -> !line.startsWith("*"))
                     .filter(line -> !line.startsWith("*/"))
                     .count();
-
             return (int) loc;
         } else {
-            // Metodo senza corpo (es. astratto o interfaccia)
             return 0;
         }
     }
 
     public static int getStatementCount(MethodDeclaration methodDecl) {
-
         Optional<BlockStmt> bodyOpt = methodDecl.getBody();
         if (bodyOpt.isEmpty()) {
             return 0;
         }
-
         BlockStmt body = bodyOpt.get();
-
-        // Contiamo tutti gli statement diretti nel blocco principale
         return (int) body.findAll(Statement.class).stream().count();
     }
 
     public static int getCyclomaticComplexity(MethodDeclaration methodDecl) {
         if (methodDecl.getBody().isEmpty()) {
-            return 1; // valore minimo
+            return 1;
         }
-
         BlockStmt body = methodDecl.getBody().get();
-        int complexity = 1; // punto di partenza
-
-        // Conta le strutture di controllo
+        int complexity = 1;
         complexity += body.findAll(IfStmt.class).size();
         complexity += body.findAll(ForStmt.class).size();
         complexity += body.findAll(ForEachStmt.class).size();
@@ -516,16 +489,11 @@ public class GitService {
         complexity += body.findAll(DoStmt.class).size();
         complexity += body.findAll(SwitchEntry.class).stream()
                 .mapToInt(entry -> entry.getLabels().isEmpty() ? 0 : 1)
-                .sum(); // conta i 'case', ignora 'default'
-        complexity += body.findAll(CatchClause.class).size();
-
-        // Conta gli operatori logici && e || come rami condizionali
+                .sum();
         complexity += (int) body.findAll(BinaryExpr.class).stream()
                 .filter(expr -> expr.getOperator() == BinaryExpr.Operator.AND
                         || expr.getOperator() == BinaryExpr.Operator.OR)
                 .count();
-
         return complexity;
     }
-
 }

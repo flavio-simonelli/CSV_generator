@@ -11,4 +11,9 @@ public class GitException extends RuntimeException {
     public String getOperation() {
         return operation;
     }
+
+    @Override
+    public String toString() {
+        return "GitException: operation='" + operation + "', message='" + getMessage() + "'";
+    }
 }

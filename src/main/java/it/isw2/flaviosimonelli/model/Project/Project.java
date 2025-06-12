@@ -6,12 +6,12 @@ import it.isw2.flaviosimonelli.model.Version;
 import java.util.List;
 
 public class Project {
-    private String name; // name of the project, usually the name of the Git repository
-    private String jiraID; // ID of the project in Jira, used to retrieve tickets
-    private ApproachProportion approachProportion; // Approach for the proportion applied to the ticket in a project
-    private String gitBranch; // Branch of the Git repository to work with
-    private String gitDirectory; // Directory where the Git repository is located or will be cloned
-    private String releaseTagFormat; // Convention for release tags, e.g. "v{VERSION}" or "release-{VERSION}"
+    private final String name; // name of the project, usually the name of the Git repository
+    private final String jiraID; // ID of the project in Jira, used to retrieve tickets
+    private final ApproachProportion approachProportion; // Approach for the proportion applied to the ticket in a project
+    private final String gitBranch; // Branch of the Git repository to work with
+    private final String gitDirectory; // Directory where the Git repository is located or will be cloned
+    private final String releaseTagFormat; // Convention for release tags, e.g. "v{VERSION}" or "release-{VERSION}"
     private List<Ticket> tickets; // List of tickets associated with the project, retrieved from Jira
     private List<Version> versions; // List of versions associated with the project
 
@@ -25,41 +25,23 @@ public class Project {
         this.releaseTagFormat = releaseTagFormat;
     }
 
-    // Default constructor for creating an empty project
-    public Project() {
-        // Empty constructor for creating an empty project
-    }
-
     // Getters and Setters for all fields
     public String getName() {
         return name;
-    }
-    public void setName(String name) {
-        this.name = name;
     }
 
     public String getJiraID() {
         return jiraID;
     }
-    public void setJiraID(String jiraID) {
-        this.jiraID = jiraID;
-    }
 
     public ApproachProportion getApproachProportion() { return approachProportion; }
-    public void setApproachProportion(ApproachProportion approachProportion) { this.approachProportion = approachProportion; }
 
     public String getGitBranch() {
         return gitBranch;
     }
-    public void setGitBranch(String gitBranch) {
-        this.gitBranch = gitBranch;
-    }
 
     public String getGitDirectory() {
         return gitDirectory;
-    }
-    public void setGitDirectory(String gitDirectory) {
-        this.gitDirectory = gitDirectory;
     }
 
     public List<Ticket> getTickets() {

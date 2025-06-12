@@ -7,8 +7,7 @@ package it.isw2.flaviosimonelli.model.method;
  */
 public class Method {
     private final String signature;    // The method signature (name and parameters)
-    private final String className;    // The name of the class containing this method
-    private final String path;         // The source file path
+    private final String classPath;    // The name of the class containing this method
     private final String version;      // The version of the project al quale appartiene il metodo
     private final String content;
     private final Metric metric;       // The metrics associated with this method
@@ -18,14 +17,14 @@ public class Method {
      * Constructs a new Method object with all required information.
      *
      * @param signature The method signature (name and parameters)
-     * @param className The name of the class containing this method
-     * @param path      The source file path
+     * @param classPath The path of the class containing this method
      * @param metric    The metrics associated with this method
+     * @param content   The content of the method (e.g., source code)
+     * @param version   The version project al quale appartiene il metodo
      */
-    public Method(String signature, String className, String path, String content, String version, Metric metric) {
+    public Method(String signature, String classPath, String version, String content, Metric metric) {
         this.signature = signature;
-        this.className = className;
-        this.path = path;
+        this.classPath = classPath;
         this.content = content;
         this.version = version;
         this.metric = metric;
@@ -36,14 +35,13 @@ public class Method {
      * Constructs a new Method object with all required information, without metric.
      *
      * @param signature The method signature (name and parameters)
-     * @param className The name of the class containing this method
-     * @param path      The source file path
-     * @param version   The version of the method, if applicable (e.g., for versioned APIs)
+     * @param classPath The path of the class containing this method
+     * @param content   The content of the method (e.g., source code)
+     * @param version   The version of the method al quale appartiene il metodo
      */
-    public Method(String signature, String className, String path, String version, String content) {
+    public Method(String signature, String classPath, String version, String content) {
         this.signature = signature;
-        this.className = className;
-        this.path = path;
+        this.classPath = classPath;
         this.version = version;
         this.content = content;
         this.metric = new Metric(); // Initialize with default metrics
@@ -64,18 +62,10 @@ public class Method {
      *
      * @return The class name
      */
-    public String getClassName() {
-        return className;
+    public String getClassPath() {
+        return classPath;
     }
 
-    /**
-     * Returns the source file path.
-     *
-     * @return The file path
-     */
-    public String getPath() {
-        return path;
-    }
 
     /**
      * Returns the content of the method.
